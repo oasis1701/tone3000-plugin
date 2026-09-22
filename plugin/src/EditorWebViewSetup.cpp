@@ -100,6 +100,12 @@ bool GuardedWebView::pageLoadHadNetworkError(const juce::String& errorInfo) {
 
 void GuardedWebView::pageFinishedLoading(const juce::String&) {
   recoveryInFlight = false;
+  // Standalone: put the keyboard on the page as soon as there is one. The
+  // OAuth pages that load in this same view get it too, which is what a
+  // user about to type a login wants. `isShowing` guards the assertion in
+  // grabKeyboardFocus for a load that completes while the window is hidden.
+  if (grabsKeyboardFocusOnLoad && isShowing())
+    grabKeyboardFocus();
 }
 
 // WebView2's cache/storage folder (Windows only). A stable per-user location

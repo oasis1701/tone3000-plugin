@@ -32,6 +32,13 @@ void forwardKeyToHost(void* nativeHandle, HostKey key) {
   PostMessageW(host, WM_KEYUP, virtualKey, up);
 }
 
+bool nativeWindowHoldsKeyboardFocusItself(void* nativeHandle) {
+  // GetFocus answers only for the calling thread's queue: NULL while another
+  // application is active, the WebView2 child while the page has the
+  // keyboard, and our own HWND in exactly the state we are looking for.
+  return nativeHandle != nullptr && GetFocus() == static_cast<HWND>(nativeHandle);
+}
+
 }  // namespace EditorWebViewSetup
 
 #elif JUCE_LINUX
@@ -93,6 +100,10 @@ void forwardKeyToHost(void* nativeHandle, HostKey key) {
 
   XCloseDisplay(display);  // flushes the queue
 }
+
+// The deferred-activation quirk this detects is specific to JUCE's Windows
+// peer; nothing to catch here.
+bool nativeWindowHoldsKeyboardFocusItself(void*) { return false; }
 
 }  // namespace EditorWebViewSetup
 

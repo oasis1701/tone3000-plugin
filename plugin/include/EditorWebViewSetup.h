@@ -83,6 +83,16 @@ enum class HostKey { space, enter };
 void forwardKeyToHost(void* nativeHandle, HostKey key);
 
 /**
+ * True when the OS keyboard focus is on this native window itself rather
+ * than on a child (the web view) or on another window: the window is
+ * active, yet nothing inside it owns the keyboard. Windows only; false on
+ * every other platform. Takes the editor's peer native handle; implemented
+ * in WindowKeyEvents.cpp / .mm. See TONE3000Editor::timerCallback for why
+ * this state has to be detected rather than trusted never to happen.
+ */
+bool nativeWindowHoldsKeyboardFocusItself(void* nativeHandle);
+
+/**
  * Main-UI WebView with a navigation allowlist.
  *
  * Native integration (loadTone, presets, clipboard, auth token, ...) is
@@ -104,6 +114,14 @@ public:
    */
   void setRecoveryUrl(const juce::String& url) { recoveryUrl = url; }
 
+  /**
+   * Take keyboard focus every time a page finishes loading (standalone
+   * only; see the editor constructor). This is what makes the UI keyboard
+   * and screen-reader operable from launch: the focus request travels into
+   * the native web control, which then owns the keyboard.
+   */
+  void setGrabsKeyboardFocusOnLoad(bool shouldGrab) { grabsKeyboardFocusOnLoad = shouldGrab; }
+
   bool pageAboutToLoad(const juce::String& newUrl) override;
   void newWindowAttemptingToLoad(const juce::String& newUrl) override;
   bool pageLoadHadNetworkError(const juce::String& errorInfo) override;
@@ -116,6 +134,7 @@ private:
   // True while a recovery load is in flight; stops the failure handler from
   // looping if the recovery URL itself fails (dev server down).
   bool recoveryInFlight = false;
+  bool grabsKeyboardFocusOnLoad = false;
 };
 
 }  // namespace EditorWebViewSetup

@@ -98,6 +98,20 @@ TONE3000Editor::TONE3000Editor(TONE3000Processor& p) : AudioProcessorEditor(&p),
   mainWebView->setOpaque(true);
   addAndMakeVisible(*mainWebView);
 
+  // Keyboard access. JUCE only hands keyboard focus to a component that asks
+  // for it, and the webview forwards that focus into the native web control
+  // (WebView2's MoveFocus / WKWebView's first responder) from
+  // focusGainedWithDirection. Without the flag the window could be active
+  // with nothing focused: Tab, arrows and screen readers were dead until the
+  // user clicked inside the UI. With it, window activation (and a host that
+  // gives its plugin window focus) lands on the web content, and the
+  // standalone grabs focus itself once the page has loaded, since no host is
+  // there to do it. Plugins never grab on their own: stealing focus on open
+  // would take the host's transport keys away (see keyPassthrough.ts).
+  mainWebView->setWantsKeyboardFocus(true);
+  mainWebView->setGrabsKeyboardFocusOnLoad(processor.wrapperType ==
+                                           juce::AudioProcessor::wrapperType_Standalone);
+
   // Bespoke audio settings (standalone only): the controller listens to the
   // device manager and pushes changes to the UI, which re-pulls state.
   if (StandaloneAudioSettings::isAvailable())
@@ -240,8 +254,44 @@ void TONE3000Editor::setExtraContentHeight(int pixels, int persistentPixels) {
 }
 
 void TONE3000Editor::timerCallback() {
+  if (mainWebView == nullptr)
+    return;
+
+#if JUCE_WINDOWS
+  // Keyboard focus safety net (Windows). JUCE defers the focus handling of a
+  // click-activation (WM_SETFOCUS) until the click's mouse event arrives at
+  // its window, but a click into the web view is delivered to the WebView2
+  // child window and never reaches JUCE, so the "waiting for a click" flag
+  // stays set. From then on every activation that is not a click (Alt+Tab
+  // back to the app, a dialog closing) is ignored: OS focus rests on the
+  // bare JUCE window, the page never receives it, and the keyboard is dead
+  // until the user clicks again, which a keyboard or screen-reader user
+  // cannot do. Detect that state and hand focus to the web view. Give first
+  // then grab: JUCE's own bookkeeping may still list the web view as focused
+  // from before, and a repeated grab is a no-op.
+  if (mainWebView->isShowing()) {
+    if (auto* peer = getPeer()) {
+      if (EditorWebViewSetup::nativeWindowHoldsKeyboardFocusItself(peer->getNativeHandle())) {
+        // Throttled diagnostics: one line when the net starts firing, then
+        // every 20th tick, so a burst shows up in TONE3000.log without
+        // flooding it.
+        if (focusNetFires++ % 20 == 0)
+          juce::Logger::writeToLog("[Focus] " + juce::Time::getCurrentTime().toString(false, true, true, true) +
+                                   " safety net: focus on bare window, moving it to the webview (fire #" +
+                                   juce::String(focusNetFires) + ")");
+        mainWebView->giveAwayKeyboardFocus();
+        mainWebView->grabKeyboardFocus();
+      } else if (focusNetFires > 0) {
+        juce::Logger::writeToLog("[Focus] " + juce::Time::getCurrentTime().toString(false, true, true, true) +
+                                 " safety net: settled after " + juce::String(focusNetFires) + " fire(s)");
+        focusNetFires = 0;
+      }
+    }
+  }
+#endif
+
   const juce::uint32 revision = processor.getCurrentChainRevision();
-  if (revision == lastPushedRevision || mainWebView == nullptr)
+  if (revision == lastPushedRevision)
     return;
   lastPushedRevision = revision;
   mainWebView->emitEventIfBrowserIsVisible("chainChanged",

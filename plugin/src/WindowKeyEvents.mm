@@ -11,6 +11,10 @@ namespace EditorWebViewSetup {
 // no-op rather than teaching the UI a second platform check.
 void forwardKeyToHost(void*, HostKey) {}
 
+// The deferred-activation quirk this detects is specific to JUCE's Windows
+// peer; nothing to catch here.
+bool nativeWindowHoldsKeyboardFocusItself(void*) { return false; }
+
 }  // namespace EditorWebViewSetup
 
 #else
@@ -60,6 +64,10 @@ void forwardKeyToHost(void* nsViewPtr, HostKey key) {
   [NSApp postEvent:keyEvent(NSEventTypeKeyDown) atStart:NO];
   [NSApp postEvent:keyEvent(NSEventTypeKeyUp) atStart:NO];
 }
+
+// The deferred-activation quirk this detects is specific to JUCE's Windows
+// peer; nothing to catch here.
+bool nativeWindowHoldsKeyboardFocusItself(void*) { return false; }
 
 }  // namespace EditorWebViewSetup
 

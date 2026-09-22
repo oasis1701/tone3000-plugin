@@ -79,6 +79,10 @@ private:
   // deferred cascade from that relayout are both covered.
   bool restoringSize = false;
 
+  // Consecutive timer ticks on which the keyboard-focus safety net fired
+  // (see timerCallback); drives its throttled log lines.
+  int focusNetFires = 0;
+
   // One shared dark theme for JUCE-drawn surfaces (standalone settings dialog
   // etc.); installed as the default LookAndFeel in the editor constructor.
   juce::SharedResourcePointer<DarkLookAndFeel> darkLookAndFeel;

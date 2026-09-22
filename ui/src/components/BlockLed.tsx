@@ -88,6 +88,10 @@ export const BlockLed: React.FC<BlockLedProps> = React.memo(function BlockLed({
       }}
       {...controlProps(HELP.clipDot, 'Clipped, clear')}
       style={{
+        // Block, not the button default inline-block: an inline box would add
+        // a line-box descender under the dot and shift it up inside its
+        // absolutely positioned wrapper.
+        display: 'block',
         width: `${size}rem`,
         height: `${size}rem`,
         borderRadius: '50%',

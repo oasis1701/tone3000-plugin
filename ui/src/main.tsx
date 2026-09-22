@@ -23,6 +23,26 @@ window.addEventListener('drop', (e) => e.preventDefault());
 // hand them to the host (see keyPassthrough.ts).
 installKeyPassthrough();
 
+// Input modality for the focus ring (see :focus-visible in index.css).
+// Buttons and knobs only show the ring after keyboard focus, which the
+// browser's own :focus-visible heuristic handles. Text fields are the
+// exception: a field counts as keyboard-focused even when clicked, so the
+// ring on fields is gated on this class, set by a navigation key and
+// cleared by any pointer press. A mouse user therefore sees the UI exactly
+// as before.
+{
+  const root = document.documentElement;
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key === 'Tab' || e.key.startsWith('Arrow') || e.key === 'Enter' || e.key === ' ')
+        root.classList.add('t3k-keyboard');
+    },
+    true
+  );
+  window.addEventListener('pointerdown', () => root.classList.remove('t3k-keyboard'), true);
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

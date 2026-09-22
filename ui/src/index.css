@@ -103,8 +103,25 @@ svg {
    never shows it (Chromium's heuristic), while Tab, arrows and screen-reader
    navigation do, so sighted keyboard users can see where they are. The
    outline follows border-radius, so it rounds on knobs and pills. No
-   component sets an inline `outline: none` any more; this is the one rule. */
+   component sets an inline `outline: none` any more; this is the one rule.
+
+   Text fields are special-cased: a field matches :focus-visible even when
+   it was clicked, so its ring is gated on the keyboard-modality class that
+   main.tsx maintains (set by Tab/arrows/Enter/Space, cleared by any pointer
+   press). With the mouse, fields look exactly as they always did: caret and
+   border only. */
 :focus-visible {
+  outline: 2rem solid #ffffff;
+  outline-offset: 2rem;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+html.t3k-keyboard input:focus-visible,
+html.t3k-keyboard textarea:focus-visible {
   outline: 2rem solid #ffffff;
   outline-offset: 2rem;
 }

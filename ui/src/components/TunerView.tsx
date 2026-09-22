@@ -42,24 +42,28 @@ const MAX_CENTS = 50;
 
 /**
  * Spoken updates (screen readers). The display runs at 20 Hz; speech must
- * follow the meaning instead: the note plus a coarse tuning state, spoken
- * only when that pair changes, after it has held for ANNOUNCE_STABLE_MS,
- * never faster than one phrase per ANNOUNCE_MIN_GAP_MS. Silence is reported
- * once, after NO_SIGNAL_MS without a pitch, so plucking a string repeatedly
- * does not narrate every decay.
+ * follow the meaning instead: the note plus the offset in cents rounded to
+ * ANNOUNCE_CENTS_STEP ("E2, 10 cents flat", "E2, in tune"), spoken only
+ * when that pair changes, after it has held for ANNOUNCE_STABLE_MS, never
+ * faster than one phrase per ANNOUNCE_MIN_GAP_MS. Silence is reported once,
+ * after NO_SIGNAL_MS without a pitch, so plucking a string repeatedly does
+ * not narrate every decay.
  */
 const ANNOUNCE_STABLE_MS = 350;
 const ANNOUNCE_MIN_GAP_MS = 900;
 const NO_SIGNAL_MS = 2500;
+const ANNOUNCE_CENTS_STEP = 5;
 
-/** Coarse tuning state for speech: the bars' blue / yellow / red, in words. */
-const tuningState = (cents: number): string => {
+/** The offset as spoken: in tune inside the display's window, otherwise the
+    cents rounded to the step, with the direction. */
+const spokenOffset = (cents: number): string => {
   const abs = Math.abs(cents);
   if (abs <= IN_TUNE_CENTS) return 'in tune';
-  const side = cents < 0 ? 'flat' : 'sharp';
-  if (abs <= 15) return `slightly ${side}`;
-  if (abs <= 30) return side;
-  return `very ${side}`;
+  const rounded = Math.max(
+    ANNOUNCE_CENTS_STEP,
+    Math.round(abs / ANNOUNCE_CENTS_STEP) * ANNOUNCE_CENTS_STEP
+  );
+  return `${rounded} cents ${cents < 0 ? 'flat' : 'sharp'}`;
 };
 
 // Bar colors from the center outward (blue → yellow → red), per screenshot.
@@ -256,7 +260,7 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }, ${frequency.toFixed(1)} hertz`
     : 'No signal';
   const announcementsOn = useTunerAnnouncementsEnabled();
-  const phrase = hasSignal ? `${spokenNote}${octave}, ${tuningState(cents)}` : '';
+  const phrase = hasSignal ? `${spokenNote}${octave}, ${spokenOffset(cents)}` : '';
   const [liveText, setLiveText] = useState('');
   const announcer = useRef({
     candidate: '',

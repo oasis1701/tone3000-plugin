@@ -287,6 +287,20 @@ input[type='range'].accent-blue::-moz-range-thumb {
   background: #0000ff;
 }
 
+/* Screen-reader-only text: in the accessibility tree, out of the layout
+   and invisible (the tuner's spoken updates live in one of these). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Hide scrollbar but keep scroll functionality */
 .hide-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */

@@ -7,8 +7,10 @@ import { setHintsEnabled, useHintsEnabled } from './helpText';
 import {
   setBlockNormalizeControlEnabled,
   setBlockSizeControlEnabled,
+  setTunerAnnouncementsEnabled,
   useBlockNormalizeControlEnabled,
   useBlockSizeControlEnabled,
+  useTunerAnnouncementsEnabled,
 } from './uiPreferences';
 import type { UpdateNoticeData } from '../hooks/useUpdateNotice';
 import type { AudioDevice } from '../hooks/useAudioDevice';
@@ -192,6 +194,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [tab, setTab] = useState<SettingsTab>(standalone ? initialTab : 'plugin');
 
   const hintsEnabled = useHintsEnabled();
+  const tunerAnnouncements = useTunerAnnouncementsEnabled();
   const blockNormalizeControlEnabled = useBlockNormalizeControlEnabled();
   const blockSizeControlEnabled = useBlockSizeControlEnabled();
 
@@ -313,6 +316,13 @@ export const Settings: React.FC<SettingsProps> = ({
         description="Strip under the faceplate with hover tips and CPU load."
         value={hintsEnabled}
         onChange={setHintsEnabled}
+      />
+
+      <ToggleRow
+        label="Tuner Announcements"
+        description="Speak the note and tuning state through a screen reader as they change. The tuner reading can always be read on demand."
+        value={tunerAnnouncements}
+        onChange={setTunerAnnouncementsEnabled}
       />
 
       <div style={{ marginBottom: `${SECTION_GAP}rem` }} role="radiogroup" aria-label="NAM A2 Size">

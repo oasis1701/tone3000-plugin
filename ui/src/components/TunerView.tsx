@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X as XIcon } from './icons';
 import { useNativeFunction } from '../hooks/useFunction';
 import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
+import { useTunerAnnouncementsEnabled } from './uiPreferences';
 import {
   BRAND_BLUE,
   BRAND_RED,
@@ -19,10 +20,47 @@ interface TunerReading {
 }
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+/** The same notes as a screen reader should say them. */
+const NOTE_SPOKEN = [
+  'C',
+  'C sharp',
+  'D',
+  'D sharp',
+  'E',
+  'F',
+  'F sharp',
+  'G',
+  'G sharp',
+  'A',
+  'A sharp',
+  'B',
+];
 
 // Cents window considered "in tune" and the full deflection of one side.
 const IN_TUNE_CENTS = 5;
 const MAX_CENTS = 50;
+
+/**
+ * Spoken updates (screen readers). The display runs at 20 Hz; speech must
+ * follow the meaning instead: the note plus a coarse tuning state, spoken
+ * only when that pair changes, after it has held for ANNOUNCE_STABLE_MS,
+ * never faster than one phrase per ANNOUNCE_MIN_GAP_MS. Silence is reported
+ * once, after NO_SIGNAL_MS without a pitch, so plucking a string repeatedly
+ * does not narrate every decay.
+ */
+const ANNOUNCE_STABLE_MS = 350;
+const ANNOUNCE_MIN_GAP_MS = 900;
+const NO_SIGNAL_MS = 2500;
+
+/** Coarse tuning state for speech: the bars' blue / yellow / red, in words. */
+const tuningState = (cents: number): string => {
+  const abs = Math.abs(cents);
+  if (abs <= IN_TUNE_CENTS) return 'in tune';
+  const side = cents < 0 ? 'flat' : 'sharp';
+  if (abs <= 15) return `slightly ${side}`;
+  if (abs <= 30) return side;
+  return `very ${side}`;
+};
 
 // Bar colors from the center outward (blue → yellow → red), per screenshot.
 const SIDE_COLORS = [BRAND_BLUE, BRAND_YELLOW, BRAND_YELLOW, BRAND_RED, BRAND_RED, BRAND_RED];
@@ -40,8 +78,10 @@ const BAR_TAPER_BOTTOM = (151 / 181) * 100;
 const frequencyToNote = (frequency: number) => {
   const midi = 69 + 12 * Math.log2(frequency / 440);
   const nearest = Math.round(midi);
+  const index = ((nearest % 12) + 12) % 12;
   return {
-    name: NOTE_NAMES[((nearest % 12) + 12) % 12],
+    name: NOTE_NAMES[index],
+    spoken: NOTE_SPOKEN[index],
     octave: Math.floor(nearest / 12) - 1,
     cents: (midi - nearest) * 100,
   };
@@ -59,6 +99,8 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // Stateless binding: this polls at 20 Hz, so it must not set hook state.
   const getTunerReading = useNativeFunction<TunerReading>('getTunerReading');
   const [note, setNote] = useState<string | null>(null);
+  const [spokenNote, setSpokenNote] = useState('');
+  const [octave, setOctave] = useState(0);
   const [cents, setCents] = useState(0);
   const [hasSignal, setHasSignal] = useState(false);
   const [frequency, setFrequency] = useState(0);
@@ -84,6 +126,8 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           // Light exponential smoothing so the display doesn't jitter.
           smoothedCentsRef.current = smoothedCentsRef.current * 0.6 + detected.cents * 0.4;
           setNote(detected.name);
+          setSpokenNote(detected.spoken);
+          setOctave(detected.octave);
           setCents(smoothedCentsRef.current);
           setFrequency(freq);
           setHasSignal(true);
@@ -129,7 +173,9 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         ? `polygon(0 0, 100% ${BAR_TAPER_TOP}%, 100% ${BAR_TAPER_BOTTOM}%, 0 100%)`
         : `polygon(100% 0, 0 ${BAR_TAPER_TOP}%, 0 ${BAR_TAPER_BOTTOM}%, 100% 100%)`;
     return (
+      // Decorative for screen readers: the reading block carries the meaning.
       <div
+        aria-hidden
         style={{
           display: 'flex',
           flexDirection: 'row',
@@ -178,6 +224,7 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // 61×53 triangle per the reference SVG (wider than tall, point centered).
   const triangle = (direction: 'up' | 'down', lit: boolean) => (
     <div
+      aria-hidden
       style={{
         width: '61rem',
         height: '53rem',
@@ -197,6 +244,51 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   useRestoreFocus(rootRef);
   useEscapeToClose(rootRef, onClose);
+
+  // Screen reader: the exact reading, readable on demand from the focusable
+  // center block ("E2, 12 cents flat, 82.4 hertz"), and the spoken updates
+  // (see the constants above), which go through a polite live region.
+  const readingText = hasSignal
+    ? `${spokenNote}${octave}, ${
+        absCents <= IN_TUNE_CENTS
+          ? 'in tune'
+          : `${Math.abs(roundedCents)} cents ${cents < 0 ? 'flat' : 'sharp'}`
+      }, ${frequency.toFixed(1)} hertz`
+    : 'No signal';
+  const announcementsOn = useTunerAnnouncementsEnabled();
+  const phrase = hasSignal ? `${spokenNote}${octave}, ${tuningState(cents)}` : '';
+  const [liveText, setLiveText] = useState('');
+  const announcer = useRef({
+    candidate: '',
+    since: 0,
+    announced: '',
+    lastAt: -Infinity,
+    timer: undefined as number | undefined,
+  });
+  useEffect(() => {
+    const a = announcer.current;
+    if (phrase !== a.candidate) {
+      a.candidate = phrase;
+      a.since = performance.now();
+    }
+    window.clearTimeout(a.timer);
+    const evaluate = () => {
+      const now = performance.now();
+      const candidate = a.candidate;
+      if (candidate === a.announced) return;
+      const needStable = candidate === '' ? NO_SIGNAL_MS : ANNOUNCE_STABLE_MS;
+      const wait = Math.max(needStable - (now - a.since), ANNOUNCE_MIN_GAP_MS - (now - a.lastAt));
+      if (wait > 0) {
+        a.timer = window.setTimeout(evaluate, wait);
+        return;
+      }
+      a.announced = candidate;
+      a.lastAt = now;
+      if (announcementsOn) setLiveText(candidate === '' ? 'No signal' : candidate);
+    };
+    evaluate();
+    return () => window.clearTimeout(a.timer);
+  }, [phrase, announcementsOn]);
 
   return (
     <div
@@ -238,6 +330,10 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       >
         <XIcon size={20} />
       </button>
+      {/* Spoken updates: out of the layout, in the accessibility tree. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveText}
+      </div>
       <div
         style={{
           display: 'flex',
@@ -250,8 +346,15 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         {renderBars('left', leftLit)}
 
         {/* Note + triangles always occupy the center so the grey track
-            doesn't shift when a pitch locks or drops. Idle is opacity 0. */}
+            doesn't shift when a pitch locks or drops. Idle is opacity 0.
+            The block is the on-demand reading for screen readers: focusable,
+            named with the spoken form; its visuals are hidden from the tree
+            so the letter, accidental and readout are not read twice. */}
         <div
+          tabIndex={0}
+          role="group"
+          aria-roledescription="tuner reading"
+          aria-label={readingText}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -264,6 +367,7 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {/* Top triangle points down: lit when sharp ("tune down") or in tune */}
           {triangle('down', inTune || isSharp)}
           <div
+            aria-hidden
             style={{
               position: 'relative',
               opacity: hasSignal ? 1 : 0,

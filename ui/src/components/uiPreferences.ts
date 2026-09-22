@@ -13,13 +13,15 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** Boolean preference backed by localStorage (off by default). */
-function boolPref(key: string) {
+/** Boolean preference backed by localStorage (off by default unless
+    `defaultValue` says otherwise; an unset key reads as the default). */
+function boolPref(key: string, defaultValue = false) {
   let value = (() => {
     try {
-      return localStorage.getItem(key) === 'true';
+      const stored = localStorage.getItem(key);
+      return stored === null ? defaultValue : stored === 'true';
     } catch {
-      return false;
+      return defaultValue;
     }
   })();
 
@@ -60,3 +62,11 @@ export const useBlockSizeControlEnabled = blockSizeControl.useValue;
 const presetPcNumbers = boolPref('t3k.showPresetPcNumbers');
 export const setPresetPcNumbersEnabled = presetPcNumbers.set;
 export const usePresetPcNumbersEnabled = presetPcNumbers.useValue;
+
+// Whether the tuner speaks the note and tuning state through a screen
+// reader as they change (see TunerView). On by default: a blind player
+// has no other way to follow the tuner while playing. The on-demand reading
+// is always there regardless.
+const tunerAnnouncements = boolPref('t3k.tunerAnnouncements', true);
+export const setTunerAnnouncementsEnabled = tunerAnnouncements.set;
+export const useTunerAnnouncementsEnabled = tunerAnnouncements.useValue;

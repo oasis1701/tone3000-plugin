@@ -1,6 +1,13 @@
 import React from 'react';
 import { X } from './icons';
-import { HELP, helpProps, setHintsEnabled, useHelpText, useHintsEnabled } from './helpText';
+import {
+  HELP,
+  controlProps,
+  helpProps,
+  setHintsEnabled,
+  useHelpText,
+  useHintsEnabled,
+} from './helpText';
 import { useCpuPercent } from '../hooks/useMeters';
 import { BORDER, MUTED, WHITE } from './theme';
 
@@ -52,6 +59,8 @@ export const HintBar: React.FC = () => {
 
   return (
     <div
+      role="contentinfo"
+      aria-label="Info bar"
       style={{
         width: '100%',
         height: `${HINT_HEIGHT}rem`,
@@ -84,7 +93,7 @@ export const HintBar: React.FC = () => {
       <CpuReadout />
       <button
         onClick={() => setHintsEnabled(false)}
-        {...helpProps(HELP.hideHints)}
+        {...controlProps(HELP.hideHints)}
         style={{
           display: 'flex',
           alignItems: 'center',

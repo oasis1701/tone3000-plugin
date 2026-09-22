@@ -76,6 +76,7 @@ export const PluginHeader = React.memo(function PluginHeader({
 }: PluginHeaderProps) {
   return (
     <div
+      role="banner"
       style={{
         width: '100%',
         height: '64rem',
@@ -95,7 +96,7 @@ export const PluginHeader = React.memo(function PluginHeader({
         rel="noopener noreferrer"
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16rem' }}
       >
-        <img src="/t3k.svg" alt="T3K" style={{ width: '160rem' }} />
+        <img src="/t3k.svg" alt="TONE3000 website" style={{ width: '160rem' }} />
       </a>
       {/* 40px between header items; tight pairs (undo/redo) group inside. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '40rem' }}>
@@ -114,6 +115,7 @@ export const PluginHeader = React.memo(function PluginHeader({
         <IconButton
           onClick={() => onToggleTuner(!showTuner)}
           help={HELP.tuner}
+          pressed={showTuner}
           active={showTuner}
           fillWhenActive
           size={28}

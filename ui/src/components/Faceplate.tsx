@@ -9,7 +9,7 @@ import { useParameter } from '../hooks/useParameter';
 import type { InputMode } from '../types/chain';
 import { useAutoMeasure, type AutoMeasureResult } from '../hooks/useAutoMeasure';
 import { useDismissable } from '../hooks/useDismissable';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps, helpProps } from './helpText';
 import { ChromeIconButton } from './ChromeIconButton';
 import {
   BORDER,
@@ -114,7 +114,13 @@ const InputModeButton: React.FC<{
 }> = ({ mode, branched, onChange }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // Closing hands the keyboard back to the trigger when it was inside the
+  // menu (see AccountMenu).
+  const close = useCallback(() => {
+    setOpen(false);
+    if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+  }, []);
   useDismissable(open, rootRef, close);
   const options = branched
     ? INPUT_MODE_OPTIONS.filter((option) => option.mode !== 'stereo')
@@ -136,9 +142,15 @@ const InputModeButton: React.FC<{
     >
       <style>{`.input-mode-item:hover { background-color: ${HIGHLIGHT}; }`}</style>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        {...helpProps(HELP.inputMode)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        {...controlProps(
+          HELP.inputMode,
+          `Input Mode: ${options.find((option) => option.mode === mode)?.label ?? mode}`
+        )}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -162,6 +174,8 @@ const InputModeButton: React.FC<{
 
       {open && (
         <div
+          role="menu"
+          aria-label="Input Mode"
           style={{
             position: 'absolute',
             bottom: 'calc(100% + 14rem)',
@@ -187,14 +201,19 @@ const InputModeButton: React.FC<{
           >
             Input Mode
           </div>
-          {options.map((option) => (
+          {options.map((option, index) => (
             <button
               key={option.mode}
               type="button"
+              role="menuitemradio"
+              aria-checked={option.mode === mode}
+              // Focus lands on the first row when the menu opens, so the
+              // keyboard is inside it right away.
+              autoFocus={index === 0}
               className="input-mode-item"
               onClick={() => {
                 onChange(option.mode);
-                setOpen(false);
+                close();
               }}
               style={{
                 display: 'flex',
@@ -366,6 +385,8 @@ export const Faceplate = React.memo(function Faceplate({
 
   return (
     <div
+      role="region"
+      aria-label="Faceplate"
       style={{
         width: '100%',
         height: `${PLATE_HEIGHT}rem`,

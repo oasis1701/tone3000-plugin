@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getUiScale, rem } from '../hooks/useUiScale';
 import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
-import { KeyboardSensor, PointerActivationConstraints, PointerSensor } from '@dnd-kit/dom';
+import {
+  Accessibility,
+  KeyboardSensor,
+  PointerActivationConstraints,
+  PointerSensor,
+  defaultPreset,
+} from '@dnd-kit/dom';
 import type {
   DragDropManager,
   DragEndEvent,
@@ -100,12 +106,42 @@ const sensors: Sensors = [
       }),
     ],
   }),
-  // Stock keyboard sorting: Space or Enter on a focused tile picks it up,
-  // arrows snap it one slot per press (the sortable's SortableKeyboardPlugin
-  // owns the targeting), Space/Enter drops, Escape cancels. A grab can only
-  // start on the focused tile, so this stays intentional: Space/Enter
-  // anywhere else still falls through to the host DAW (see keyPassthrough.ts).
-  KeyboardSensor,
+  // Keyboard sorting: Space on a focused tile picks it up, arrows snap it
+  // one slot per press (the sortable's SortableKeyboardPlugin owns the
+  // targeting), Space drops, Escape cancels. Enter is deliberately left out
+  // of the stock codes: it opens the tile (see GalleryBlock), the same as a
+  // click, which is what a keyboard or screen-reader user expects of a
+  // button. A grab can only start on the focused tile, so this stays
+  // intentional: Space/Enter anywhere else still falls through to the host
+  // DAW (see keyPassthrough.ts).
+  KeyboardSensor.configure({
+    keyboardCodes: {
+      start: ['Space'],
+      cancel: ['Escape'],
+      end: ['Space', 'Tab'],
+      up: ['ArrowUp'],
+      down: ['ArrowDown'],
+      left: ['ArrowLeft'],
+      right: ['ArrowRight'],
+    },
+  }),
+];
+
+/**
+ * dnd-kit's accessibility plugin describes every tile to screen readers
+ * (aria-describedby) and announces pick-ups, moves and drops in a live
+ * region. Its stock instructions say "space or enter" picks an item up,
+ * which no longer matches the sensor above, so they are restated here with
+ * what a tile actually does on each key.
+ */
+const plugins = [
+  ...defaultPreset.plugins.filter((plugin) => plugin !== Accessibility),
+  Accessibility.configure({
+    screenReaderInstructions: {
+      draggable:
+        'Press Enter to open. To move it, press Space to pick it up, use the arrow keys to move it, then press Space again to drop it or Escape to cancel. Shift+F10 opens its menu.',
+    },
+  }),
 ];
 
 type Lanes = Record<ChainSide, ChainItem[]>;
@@ -474,6 +510,7 @@ export const ChainView: React.FC<ChainViewProps> = ({
       {stereo && <StereoPanRail monoSum={monoSum} />}
       <DragDropProvider
         sensors={sensors}
+        plugins={plugins}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

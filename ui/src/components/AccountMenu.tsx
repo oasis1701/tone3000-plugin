@@ -4,7 +4,7 @@ import { LogIn, LogOut, Settings as SettingsIcon } from './icons';
 import type { User } from '../types/tone';
 import { AvatarImage } from './AvatarFallback';
 import { useDismissable } from '../hooks/useDismissable';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps } from './helpText';
 import { BORDER, SURFACE_RAISED } from './theme';
 
 /**
@@ -58,15 +58,26 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // Closing hands the keyboard back to the trigger when it was inside the
+  // menu (Escape, or a row that is about to unmount); an outside click that
+  // lands on another control keeps that control's focus.
+  const close = useCallback(() => {
+    setOpen(false);
+    if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+  }, []);
   useDismissable(open, rootRef, close);
 
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
       <style>{`.account-menu-item:hover { background-color: rgba(255, 255, 255, 0.08); }`}</style>
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        {...helpProps(HELP.account)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        {...controlProps(HELP.account, user?.username ? `Account: ${user.username}` : undefined)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -96,6 +107,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
       {open && (
         <div
+          role="menu"
+          aria-label="Account"
           style={{
             position: 'absolute',
             top: 'calc(100% + 8rem)',
@@ -111,10 +124,15 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
           }}
         >
           <button
+            type="button"
+            role="menuitem"
             className="account-menu-item"
+            // Focus lands on the first row when the menu opens, so the
+            // keyboard is inside it right away.
+            autoFocus
             style={itemStyle}
             onClick={() => {
-              setOpen(false);
+              close();
               onOpenSettings();
             }}
           >
@@ -123,10 +141,12 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
           </button>
           {authenticated ? (
             <button
+              type="button"
+              role="menuitem"
               className="account-menu-item"
               style={itemStyle}
               onClick={() => {
-                setOpen(false);
+                close();
                 onLogout();
               }}
             >
@@ -135,10 +155,12 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
             </button>
           ) : (
             <button
+              type="button"
+              role="menuitem"
               className="account-menu-item"
               style={itemStyle}
               onClick={() => {
-                setOpen(false);
+                close();
                 onLogin();
               }}
             >

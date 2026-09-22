@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X as XIcon, Laptop, Info, Gauge, Equal } from './icons';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { useParameter } from '../hooks/useParameter';
 import { useNativeFunction } from '../hooks/useFunction';
 import { setHintsEnabled, useHintsEnabled } from './helpText';
@@ -262,6 +263,12 @@ export const Settings: React.FC<SettingsProps> = ({
     [setWebInspectorEnabled]
   );
 
+  // Keyboard: focus goes back to whatever opened Settings when it closes,
+  // and Escape closes it (unless a picker list inside has the key).
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, onClose);
+
   const header = (
     <div
       style={{
@@ -271,9 +278,19 @@ export const Settings: React.FC<SettingsProps> = ({
         marginBottom: '20rem',
       }}
     >
-      <span style={{ fontSize: '22rem', fontWeight: 600, color: '#ffffff' }}>Settings</span>
+      <span
+        role="heading"
+        aria-level={1}
+        style={{ fontSize: '22rem', fontWeight: 600, color: '#ffffff' }}
+      >
+        Settings
+      </span>
       <button
+        type="button"
         onClick={onClose}
+        aria-label="Close settings"
+        // The takeover opens with the keyboard inside it.
+        autoFocus
         style={{
           background: 'transparent',
           border: 'none',
@@ -408,7 +425,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   -webkit-appearance: none;
                   margin: 0;
                 }
-                .settings-number-input:focus { outline: none; }`}
+                .settings-number-input:focus:not(:focus-visible) { outline: none; }`}
             </style>
             <div style={{ position: 'relative', width: '100%' }}>
               <input
@@ -625,7 +642,11 @@ export const Settings: React.FC<SettingsProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className="hide-scrollbar"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
       style={{
         position: 'absolute',
         top: 0,

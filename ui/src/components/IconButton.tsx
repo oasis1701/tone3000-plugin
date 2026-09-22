@@ -1,12 +1,17 @@
 import React from 'react';
-import { helpProps } from './helpText';
+import { controlProps } from './helpText';
 import { chromeIcon } from './ChromeIconButton';
 import { DISABLED_OPACITY, HIGHLIGHT, ICON_BOX_SIZE, ICON_SIZE, iconButtonStyle } from './theme';
 
 interface IconButtonProps {
   onClick: () => void;
-  /** One-line hint for the faceplate help readout (see helpText.ts). */
+  /** One-line hint for the faceplate help readout (see helpText.ts). Its
+      `Name:` prefix is also the button's accessible name. */
   help: string;
+  /** Accessible name when the help prefix isn't it. */
+  label?: string;
+  /** Toggle state for assistive technology (aria-pressed). */
+  pressed?: boolean;
   /** Lit (white icon, optional active fill) vs muted. Defaults lit. */
   active?: boolean;
   /** Grayed out and non-interactive. */
@@ -29,6 +34,8 @@ const glyphSizeFor = (box: number) =>
 export const IconButton: React.FC<IconButtonProps> = ({
   onClick,
   help,
+  label,
+  pressed,
   active = true,
   disabled = false,
   fillWhenActive = false,
@@ -39,7 +46,8 @@ export const IconButton: React.FC<IconButtonProps> = ({
     type="button"
     onClick={onClick}
     disabled={disabled}
-    {...helpProps(help)}
+    aria-pressed={pressed}
+    {...controlProps(help, label)}
     style={{
       ...iconButtonStyle(size),
       color: '#ffffff',

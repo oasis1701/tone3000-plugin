@@ -4,7 +4,14 @@ import { KnobInner } from './KnobInner';
 import type { KnobThumb, KnobVariant } from './KnobInner';
 import type { KnobScale } from './knobScale';
 import { percentScale } from './knobScale';
-import { helpProps, pinHelp, unpinHelp } from './helpText';
+import {
+  KNOB_KEYBOARD_LEGEND,
+  KNOB_KEYS,
+  helpDescription,
+  helpProps,
+  pinHelp,
+  unpinHelp,
+} from './helpText';
 import { GRAY, KNOB_LABEL_GAP, SURFACE_RAISED, WHITE } from './theme';
 import { getUiScale, rem } from '../hooks/useUiScale';
 
@@ -30,6 +37,13 @@ import { getUiScale, rem } from '../hooks/useUiScale';
  *   is taken by the reset).
  * Both key off the gesture's own pointerType, so a mouse keeps desktop
  * behavior even on a hybrid device.
+ *
+ * Keyboard (the knob is a focusable ARIA slider, in the tab order):
+ * - Arrow keys step 1% of the range, Shift+arrows 0.1%, Page Up/Down 10%,
+ *   Home/End jump to the ends. Each press is one discrete write.
+ * - Enter opens the type-in editor; Delete/Backspace resets to the default.
+ * - The label flashes the value readout after a key change, and
+ *   aria-valuetext carries the value in real units for screen readers.
  */
 interface KnobControlProps {
   label: string;
@@ -94,6 +108,13 @@ const roundKnobValue = (x: number, snapCenter: boolean, fine: boolean) => {
 };
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+/** Keyboard steps, in normalized units. */
+const KEY_STEP = 0.01;
+const KEY_STEP_FINE = 0.001;
+const KEY_STEP_PAGE = 0.1;
+/** How long the value readout stays up after a keyboard change. */
+const KEY_READOUT_MS = 1000;
 
 /** Touch double tap: the usual recognizer window, and a slop wide enough
     for two taps by the same finger without being a drag. */
@@ -380,6 +401,75 @@ export const KnobControl: React.FC<KnobControlProps> = ({
     setEditText(scale.editText(shownValue));
   }, [scale, shownValue]);
 
+  // Keyboard changes flash the readout like a drag does, so a sighted
+  // keyboard user sees the value they just set.
+  const [keyReadout, setKeyReadout] = useState(false);
+  const keyReadoutTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(keyReadoutTimer.current), []);
+  const flashReadout = useCallback(() => {
+    setKeyReadout(true);
+    window.clearTimeout(keyReadoutTimer.current);
+    keyReadoutTimer.current = window.setTimeout(() => setKeyReadout(false), KEY_READOUT_MS);
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (editing || e.altKey || e.ctrlKey || e.metaKey) return;
+      const current = valueRef.current;
+      let next: number;
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'ArrowRight':
+          next = current + (e.shiftKey ? KEY_STEP_FINE : KEY_STEP);
+          break;
+        case 'ArrowDown':
+        case 'ArrowLeft':
+          next = current - (e.shiftKey ? KEY_STEP_FINE : KEY_STEP);
+          break;
+        case 'PageUp':
+          next = current + KEY_STEP_PAGE;
+          break;
+        case 'PageDown':
+          next = current - KEY_STEP_PAGE;
+          break;
+        case 'Home':
+          next = minRef.current;
+          break;
+        case 'End':
+          next = maxRef.current;
+          break;
+        case 'Enter':
+          e.preventDefault();
+          openEditor();
+          return;
+        case 'Delete':
+        case 'Backspace': {
+          const fallback = defaultValueRef.current;
+          if (fallback === undefined) return;
+          e.preventDefault();
+          next = fallback;
+          onResetRef.current?.();
+          break;
+        }
+        default:
+          return;
+      }
+      e.preventDefault();
+      // No center detent here: with 1% steps the coarse detent would pin
+      // the value at center for good (0.5 + 0.01 snaps back to 0.5). Exact
+      // center is reachable anyway, since the steps land on it.
+      const rounded = Math.round(clamp(next, minRef.current, maxRef.current) * 10000) / 10000;
+      if (rounded !== current) {
+        liveRef.current = rounded;
+        emittedRef.current = rounded;
+        setLiveValue(rounded);
+        onChangeRef.current(rounded);
+      }
+      flashReadout();
+    },
+    [editing, flashReadout, openEditor]
+  );
+
   // Layout effect so the focus lands in the same call stack as the tap or
   // double-click that opened the editor; WKWebView only raises the on-screen
   // keyboard for focus inside a user gesture.
@@ -390,16 +480,27 @@ export const KnobControl: React.FC<KnobControlProps> = ({
     }
   }, [editing]);
 
-  const commitEdit = useCallback(() => {
-    if (editText !== null) {
-      const parsed = Number.parseFloat(editText.replace(',', '.'));
-      if (Number.isFinite(parsed)) {
-        const norm = Math.min(max, Math.max(min, scale.fromDisplay(parsed)));
-        onChangeRef.current(roundKnobValue(norm, variant === 'bipolar', true));
-      }
-    }
+  // `refocus`: Enter and Escape hand the keyboard back to the knob (the
+  // input is about to unmount, and focus would otherwise fall to the page
+  // body). A blur commit is the user already moving on, so it must not.
+  const closeEditor = useCallback((refocus: boolean) => {
     setEditText(null);
-  }, [editText, max, min, scale, variant]);
+    if (refocus) knobRef.current?.focus();
+  }, []);
+
+  const commitEdit = useCallback(
+    (refocus = false) => {
+      if (editText !== null) {
+        const parsed = Number.parseFloat(editText.replace(',', '.'));
+        if (Number.isFinite(parsed)) {
+          const norm = Math.min(max, Math.max(min, scale.fromDisplay(parsed)));
+          onChangeRef.current(roundKnobValue(norm, variant === 'bipolar', true));
+        }
+      }
+      closeEditor(refocus);
+    },
+    [closeEditor, editText, max, min, scale, variant]
+  );
 
   // Debounced readout visibility: the show timer outlasts a quick tap (so
   // double-tapping into the editor can't flash the value), and the hide
@@ -414,8 +515,14 @@ export const KnobControl: React.FC<KnobControlProps> = ({
     return () => window.clearTimeout(timer);
   }, [dragging]);
 
-  const showReadout = !editing && readoutVisible;
+  const showReadout = !editing && (readoutVisible || keyReadout);
   const slotHeight = Math.round(LABEL_SIZE * 1.2);
+
+  // What a screen reader says after the name and value: the control's
+  // purpose from its help line, then the keyboard legend in place of the
+  // pointer gestures.
+  const description =
+    `${help ? helpDescription(help).replace(KNOB_KEYS, '').trim() : ''} ${KNOB_KEYBOARD_LEGEND}`.trim();
 
   const labelText = (
     <span
@@ -440,13 +547,14 @@ export const KnobControl: React.FC<KnobControlProps> = ({
       ref={inputRef}
       value={editText ?? ''}
       onChange={(e) => setEditText(e.target.value)}
-      onBlur={commitEdit}
+      onBlur={() => commitEdit(false)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter') commitEdit();
-        else if (e.key === 'Escape') setEditText(null);
+        if (e.key === 'Enter') commitEdit(true);
+        else if (e.key === 'Escape') closeEditor(true);
       }}
       inputMode="decimal"
+      aria-label={`${label} value`}
       style={{
         width: '100%',
         height: rem(slotHeight + 4),
@@ -457,7 +565,6 @@ export const KnobControl: React.FC<KnobControlProps> = ({
         color: '#ffffff',
         fontSize: '11rem',
         textAlign: 'center',
-        outline: 'none',
         padding: 0,
       }}
     />
@@ -478,6 +585,9 @@ export const KnobControl: React.FC<KnobControlProps> = ({
       <KnobHeadless
         ref={knobRef}
         aria-label={label}
+        aria-description={description}
+        includeIntoTabOrder
+        onKeyDown={handleKeyDown}
         valueRaw={shownValue}
         valueMin={min}
         valueMax={max}
@@ -499,7 +609,7 @@ export const KnobControl: React.FC<KnobControlProps> = ({
           height: rem(size),
           position: 'relative',
           userSelect: 'none',
-          outline: 'none',
+          borderRadius: '50%',
           boxShadow: 'none',
           WebkitTapHighlightColor: 'transparent',
           cursor: 'pointer',

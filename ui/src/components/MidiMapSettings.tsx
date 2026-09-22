@@ -158,7 +158,6 @@ const ccInputStyle: React.CSSProperties = {
   fontFamily: FONT_MONO,
   textAlign: 'center',
   padding: '4rem 6rem',
-  outline: 'none',
 };
 
 const LearningRow: React.FC<{

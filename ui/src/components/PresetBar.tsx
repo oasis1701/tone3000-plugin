@@ -21,7 +21,7 @@ import type { ActivePreset, PresetInfo } from '../types/chain';
 import { useDismissable } from '../hooks/useDismissable';
 import { IS_COARSE_POINTER } from '../hooks/useUiScale';
 import { useToast } from './Toast';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps, helpProps } from './helpText';
 import { BORDER, FONT_MONO, GRAY, SEGMENTED_TRACK } from './theme';
 import { setPresetPcNumbersEnabled, usePresetPcNumbersEnabled } from './uiPreferences';
 
@@ -64,7 +64,6 @@ const inputStyle: React.CSSProperties = {
   // Typed text and placeholders are body text: reset the global 600 default.
   fontWeight: 400,
   padding: '9rem 12rem',
-  outline: 'none',
 };
 
 const sectionHeaderStyle: React.CSSProperties = {
@@ -163,7 +162,9 @@ const PresetRow: React.FC<PresetRowProps> = ({
         />
       ) : (
         <button
+          type="button"
           onClick={onLoad}
+          aria-current={isActive ? 'true' : undefined}
           style={{
             flex: 1,
             background: 'transparent',
@@ -200,8 +201,7 @@ const PresetRow: React.FC<PresetRowProps> = ({
         <button
           ref={handleRef}
           type="button"
-          aria-label="Reorder"
-          {...helpProps(HELP.presetDrag)}
+          {...controlProps(HELP.presetDrag, `Reorder ${preset.name}`)}
           style={{
             ...iconButtonStyle,
             padding: '3rem',
@@ -218,15 +218,17 @@ const PresetRow: React.FC<PresetRowProps> = ({
         !isRenaming && (
           <>
             <button
+              type="button"
               onClick={onStartRename}
-              {...helpProps(HELP.presetRename)}
+              {...controlProps(HELP.presetRename, `Rename ${preset.name}`)}
               style={{ ...iconButtonStyle, padding: '3rem' }}
             >
               <Pencil size={13} />
             </button>
             <button
+              type="button"
               onClick={onDelete}
-              {...helpProps(HELP.presetDelete)}
+              {...controlProps(HELP.presetDelete, `Delete ${preset.name}`)}
               style={{ ...iconButtonStyle, padding: '3rem' }}
             >
               <Trash2 size={13} />
@@ -451,12 +453,20 @@ export const PresetBar: React.FC<PresetBarProps> = ({
           flexShrink: 0,
         }}
       >
-        <button onClick={() => step(-1)} {...helpProps(HELP.presetPrev)} style={chevronStyle}>
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          {...controlProps(HELP.presetPrev)}
+          style={chevronStyle}
+        >
           <ChevronLeft size={14} />
         </button>
         <button
+          type="button"
           onClick={openBrowse}
-          {...helpProps(HELP.presetBrowse)}
+          aria-haspopup="dialog"
+          aria-expanded={open === 'browse'}
+          {...controlProps(HELP.presetBrowse, active ? `Presets: ${active.name}` : 'Presets')}
           style={{
             background: 'transparent',
             border: 'none',
@@ -483,13 +493,25 @@ export const PresetBar: React.FC<PresetBarProps> = ({
         >
           {active?.name ?? 'Presets'}
         </button>
-        <button onClick={() => step(1)} {...helpProps(HELP.presetNext)} style={chevronStyle}>
+        <button
+          type="button"
+          onClick={() => step(1)}
+          {...controlProps(HELP.presetNext)}
+          style={chevronStyle}
+        >
           <ChevronRight size={14} />
         </button>
       </div>
 
       {/* Save */}
-      <button onClick={openSave} {...helpProps(HELP.presetSave)} style={iconButtonStyle}>
+      <button
+        type="button"
+        onClick={openSave}
+        aria-haspopup="dialog"
+        aria-expanded={open === 'save'}
+        {...controlProps(HELP.presetSave)}
+        style={iconButtonStyle}
+      >
         <Save size={18} />
       </button>
 
@@ -508,7 +530,7 @@ export const PresetBar: React.FC<PresetBarProps> = ({
 
       {/* Save popover */}
       {open === 'save' && (
-        <div style={{ ...panelStyle, width: '280rem' }}>
+        <div role="dialog" aria-label="Save Preset" style={{ ...panelStyle, width: '280rem' }}>
           <div
             style={{ color: '#ffffff', fontSize: '14rem', fontWeight: 600, marginBottom: '12rem' }}
           >
@@ -523,9 +545,11 @@ export const PresetBar: React.FC<PresetBarProps> = ({
               if (e.key === 'Enter') handleSave();
             }}
             placeholder="Name"
+            aria-label="Preset name"
             style={inputStyle}
           />
           <button
+            type="button"
             onClick={handleSave}
             disabled={!saveName.trim()}
             style={{
@@ -549,6 +573,8 @@ export const PresetBar: React.FC<PresetBarProps> = ({
           the list clips at the search row and the panel border. */}
       {open === 'browse' && (
         <div
+          role="dialog"
+          aria-label="Presets"
           style={{
             ...panelStyle,
             width: '360rem',
@@ -574,14 +600,16 @@ export const PresetBar: React.FC<PresetBarProps> = ({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search presets"
+                aria-label="Search presets"
                 style={{ ...inputStyle, padding: '8rem 12rem 8rem 32rem', borderRadius: '10rem' }}
               />
             </div>
             {presets.length > 0 && (
               <button
+                type="button"
                 onClick={() => setPresetPcNumbersEnabled(!showPcNumbers)}
                 aria-pressed={showPcNumbers}
-                {...helpProps(HELP.presetPcToggle)}
+                {...controlProps(HELP.presetPcToggle, 'Show MIDI program change numbers')}
                 style={{
                   ...iconButtonStyle,
                   padding: '7rem',
@@ -595,9 +623,10 @@ export const PresetBar: React.FC<PresetBarProps> = ({
             )}
             {presets.length > 1 && (
               <button
+                type="button"
                 onClick={() => setReordering((prev) => !prev)}
                 aria-pressed={reordering}
-                {...helpProps(HELP.presetReorder)}
+                {...controlProps(HELP.presetReorder)}
                 style={{
                   ...iconButtonStyle,
                   padding: '7rem',

@@ -1,13 +1,14 @@
 import React from 'react';
 import { rem } from '../hooks/useUiScale';
 import { Circle } from './icons';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps } from './helpText';
 import { GRAY, HIGHLIGHT, SURFACE_RAISED } from './theme';
 
 /**
  * Mono/stereo pill switch that lives in the top bar. Both chains render at
  * once in stereo mode (see ChainView), so this is the only stereo-mode
- * control outside the chain gallery.
+ * control outside the chain gallery. Exposed as a two-option radio group:
+ * exactly one side is ever selected.
  */
 
 // Two overlapping 12px circles (no lucide equivalent), drawn to match
@@ -63,6 +64,8 @@ export const StereoModeToggle: React.FC<{
 
   return (
     <div
+      role="radiogroup"
+      aria-label="Chain mode"
       style={{
         position: 'relative',
         display: 'flex',
@@ -92,15 +95,21 @@ export const StereoModeToggle: React.FC<{
         }}
       />
       <button
+        type="button"
+        role="radio"
+        aria-checked={!stereoEnabled}
         onClick={() => onToggle(false)}
-        {...helpProps(HELP.monoMode)}
+        {...controlProps(HELP.monoMode)}
         style={segmentStyle(!stereoEnabled)}
       >
         <Circle size={12} strokeWidth={3} />
       </button>
       <button
+        type="button"
+        role="radio"
+        aria-checked={stereoEnabled}
         onClick={() => onToggle(true)}
-        {...helpProps(HELP.stereoMode)}
+        {...controlProps(HELP.stereoMode)}
         style={segmentStyle(stereoEnabled)}
       >
         <StereoCirclesIcon size={12} />

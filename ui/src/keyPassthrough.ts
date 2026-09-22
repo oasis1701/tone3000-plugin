@@ -30,10 +30,14 @@ export function installKeyPassthrough(): void {
       // Editable and interactive elements keep the key (typing in preset
       // names/search, Enter committing a value edit, activating a focused
       // button).
+      // `[tabindex]` covers every custom control the UI makes focusable
+      // (knobs are role="slider", tone cards role="button", list options):
+      // Enter on a focused knob opens its value editor and must not reach
+      // the transport.
       if (
         e.target instanceof Element &&
         e.target.closest(
-          'input, textarea, select, button, a[href], [contenteditable], [role="button"]'
+          'input, textarea, select, button, a[href], [contenteditable], [role="button"], [tabindex]'
         )
       ) {
         return;

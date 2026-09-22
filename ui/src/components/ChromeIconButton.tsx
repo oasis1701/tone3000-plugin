@@ -1,5 +1,5 @@
 import React from 'react';
-import { helpProps } from './helpText';
+import { controlProps } from './helpText';
 import {
   BLACK,
   BORDER,
@@ -25,8 +25,18 @@ export type ChromeTone = 'plain' | 'power' | 'armed' | 'link';
 
 interface ChromeIconButtonProps {
   onClick: (e: React.MouseEvent) => void;
-  /** One-line hint for the faceplate help readout (see helpText.ts). */
+  /** One-line hint for the faceplate help readout (see helpText.ts). Its
+      `Name:` prefix is also the button's accessible name. */
   help: string;
+  /** Accessible name when the help prefix isn't it. */
+  label?: string;
+  /** Toggle state for assistive technology. Defaults to `on` for the
+      power / armed / link tones (they are toggles by definition); a plain
+      button passes it explicitly or not at all. */
+  pressed?: boolean;
+  /** Disclosure state (aria-expanded) for a button that opens a panel.
+      Defaults to `open` when that prop is given. */
+  expanded?: boolean;
   children: React.ReactNode;
   /**
    * plain: white icon (optional HIGHLIGHT via `filled`).
@@ -117,11 +127,14 @@ export function chromeIcon(node: React.ReactNode, size?: number): React.ReactNod
 export const ChromeIconButton: React.FC<ChromeIconButtonProps> = ({
   onClick,
   help,
+  label,
+  pressed,
+  expanded,
   children,
   tone = 'plain',
   on = true,
   filled = false,
-  open = false,
+  open,
   offsetY,
   onMouseDown,
   disabled = false,
@@ -132,14 +145,16 @@ export const ChromeIconButton: React.FC<ChromeIconButtonProps> = ({
     onClick={onClick}
     onMouseDown={onMouseDown}
     disabled={disabled}
-    {...helpProps(help)}
+    aria-pressed={pressed ?? (tone !== 'plain' ? on : undefined)}
+    aria-expanded={expanded ?? open}
+    {...controlProps(help, label)}
     style={{
       ...iconButtonStyle(ICON_BOX_SIZE),
       // Grid on the button itself: one centering context, no nested span.
       display: 'grid',
       placeItems: 'center',
       ...toneChrome(tone, on, filled),
-      ...(open
+      ...(open === true
         ? {
             color: BLACK,
             backgroundColor: WHITE,
@@ -166,6 +181,13 @@ export const ChromeIconButton: React.FC<ChromeIconButtonProps> = ({
 interface ChromeTextButtonProps {
   onClick: () => void;
   help: string;
+  /** Accessible name when the help prefix isn't it. */
+  label?: string;
+  /** Toggle state for assistive technology (aria-pressed): pass for a
+      button whose `armed` look means "on" (PRE). */
+  pressed?: boolean;
+  /** Disclosure state (aria-expanded). Defaults to `open` when given. */
+  expanded?: boolean;
   children: React.ReactNode;
   armed?: boolean;
   open?: boolean;
@@ -200,18 +222,23 @@ const textChrome = (
 export const ChromeTextButton: React.FC<ChromeTextButtonProps> = ({
   onClick,
   help,
+  label,
+  pressed,
+  expanded,
   children,
   armed = false,
-  open = false,
+  open,
   style,
 }) => (
   <button
     type="button"
     onClick={onClick}
-    {...helpProps(help)}
+    aria-pressed={pressed}
+    aria-expanded={expanded ?? open}
+    {...controlProps(help, label)}
     style={{
       ...textBoxStyle(),
-      ...textChrome(armed, open),
+      ...textChrome(armed, open ?? false),
       lineHeight: 1,
       ...style,
     }}

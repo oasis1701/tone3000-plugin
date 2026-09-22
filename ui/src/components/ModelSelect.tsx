@@ -44,7 +44,8 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const activeOptionRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const activeOptionRef = useRef<HTMLButtonElement | null>(null);
 
   const currentIndex = options.findIndex((opt) => opt.id === value);
   const selectedOption = options[currentIndex];
@@ -77,9 +78,29 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
   const handleSelect = (id: string) => {
     onChange(id);
     setIsOpen(false);
+    // A pick (or Escape, via the dismiss below) hands the keyboard back to
+    // the trigger, so the user isn't left on a row that just unmounted.
+    triggerRef.current?.focus();
   };
 
-  const close = useCallback(() => setIsOpen(false), []);
+  const toggleOpen = () => {
+    if (!isOpen) onOpen?.();
+    setIsOpen(!isOpen);
+  };
+
+  // Arrows walk the rows once the list has the keyboard.
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    const index = rows.indexOf(document.activeElement as HTMLButtonElement);
+    rows[(index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length]?.focus();
+  };
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
   useDismissable(isOpen, containerRef, close);
 
   return (
@@ -108,8 +129,10 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
       >
         {/* Previous button */}
         <button
+          type="button"
           onClick={handlePrev}
           disabled={currentIndex <= 0}
+          aria-label="Previous model"
           style={{
             background: 'none',
             border: 'none',
@@ -126,9 +149,19 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
 
         {/* Name / Dropdown trigger */}
         <div
-          onClick={() => {
-            if (!isOpen) onOpen?.();
-            setIsOpen(!isOpen);
+          ref={triggerRef}
+          role="button"
+          tabIndex={0}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-label={`Model: ${selectedOption?.name ?? 'none selected'}, ${currentIndex + 1} of ${totalCount}`}
+          onClick={toggleOpen}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (!isOpen) toggleOpen();
+            }
           }}
           style={{
             flex: 1,
@@ -158,8 +191,10 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
 
         {/* Next button */}
         <button
+          type="button"
           onClick={handleNext}
           disabled={currentIndex >= options.length - 1}
+          aria-label="Next model"
           style={{
             background: 'none',
             border: 'none',
@@ -211,6 +246,9 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
         <div
           ref={dropdownRef}
           className="hide-scrollbar"
+          role="listbox"
+          aria-label="Models"
+          onKeyDown={handleListKeyDown}
           style={{
             position: 'absolute',
             bottom: '100%',
@@ -226,11 +264,21 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
           }}
         >
           {options.map((option, index) => (
-            <div
+            <button
               key={option.id}
+              type="button"
+              role="option"
+              aria-selected={option.id === value}
               ref={option.id === value ? activeOptionRef : undefined}
+              // The keyboard lands on the loaded model (or the first row).
+              autoFocus={option.id === (selectedOption?.id ?? options[0]?.id)}
               onClick={() => handleSelect(option.id)}
               style={{
+                display: 'block',
+                width: '100%',
+                border: 'none',
+                textAlign: 'left',
+                fontFamily: 'inherit',
                 padding: '12rem 16rem',
                 cursor: 'pointer',
                 color: 'white',
@@ -256,7 +304,7 @@ export const ModelSelect: React.FC<ModelSelectProps> = ({
               }}
             >
               {option.name}
-            </div>
+            </button>
           ))}
           {loading && (
             <div

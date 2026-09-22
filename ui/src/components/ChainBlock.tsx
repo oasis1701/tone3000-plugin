@@ -14,6 +14,7 @@ import {
 } from './icons';
 import { ToneImage } from './GearIcon';
 import { rem } from '../hooks/useUiScale';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { KnobControl } from './KnobControl';
 import { gainDbScale } from './knobScale';
 import { BusyOverlay, LoadingDots } from './LoadingDots';
@@ -42,7 +43,7 @@ import { timeAgoShort } from '../t3k/timeAgoShort';
 import { formatLabel, gearLabel } from '../t3k/labels';
 import { AvatarImage } from './AvatarFallback';
 import { FormatBadge } from './FormatBadge';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps, helpProps } from './helpText';
 import { useBlockNormalizeControlEnabled, useBlockSizeControlEnabled } from './uiPreferences';
 import { useToast } from './Toast';
 import { ChromeIconButton, ChromeTextButton, chromeIcon } from './ChromeIconButton';
@@ -104,7 +105,11 @@ const BookmarkStat: React.FC<{
     <button
       type="button"
       onClick={onToggle}
-      {...helpProps(favorited ? HELP.unfavoriteTone : HELP.favoriteTone)}
+      aria-pressed={favorited}
+      {...controlProps(
+        favorited ? HELP.unfavoriteTone : HELP.favoriteTone,
+        `Favorite, ${formatCount(value)}`
+      )}
       style={{
         ...row,
         background: 'transparent',
@@ -164,6 +169,8 @@ const BlockSizeControl: React.FC<{
   if (!interactive) {
     return (
       <div
+        role="img"
+        aria-label={`NAM Size: ${full ? 'FULL' : 'LITE'}`}
         {...helpProps(HELP.blockSizeChip)}
         style={{ ...segmentedGroupStyle(), cursor: 'default' }}
       >
@@ -174,11 +181,18 @@ const BlockSizeControl: React.FC<{
     );
   }
   return (
-    <div {...helpProps(HELP.blockSize)} style={segmentedGroupStyle()}>
+    <div
+      role="radiogroup"
+      aria-label="NAM Size"
+      {...helpProps(HELP.blockSize)}
+      style={segmentedGroupStyle()}
+    >
       {([false, true] as const).map((isFull) => (
         <button
           key={String(isFull)}
           type="button"
+          role="radio"
+          aria-checked={full === isFull}
           onClick={() => onChange(isFull)}
           style={{
             ...segmentedCellStyle(),
@@ -547,9 +561,18 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
 
   const tonePageUrl = infoTone?.url || tone.url || `${T3K_API}/tones/${tone.id}`;
 
+  // Keyboard: focus returns to the tile that opened the card when it closes;
+  // Escape goes back to the chain (unless the model list has the key).
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, onBack);
+
   return (
     <div
+      ref={rootRef}
       className={showInfo ? 'hide-scrollbar' : undefined}
+      role="region"
+      aria-label={`Block: ${tone.title}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -574,7 +597,9 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
         <button
           type="button"
           onClick={onBack}
-          {...helpProps(HELP.backToChain)}
+          // The takeover opens with the keyboard inside it.
+          autoFocus
+          {...controlProps(HELP.backToChain, 'Back to the chain')}
           style={{
             alignSelf: 'flex-start',
             display: 'flex',
@@ -584,7 +609,6 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
             flexShrink: 0,
             background: 'transparent',
             border: 'none',
-            outline: 'none',
             padding: 0,
             cursor: 'pointer',
             color: WHITE,
@@ -657,6 +681,8 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                 while the calibration setting is off. */}
               {showCalibration && (
                 <span
+                  role="img"
+                  aria-label={`Calibration ${calibrationActive ? 'active' : 'inactive'}`}
                   {...helpProps(calibrationActive ? HELP.blockCalibrated : HELP.blockUncalibrated)}
                   style={{
                     width: `${ICON_BOX_SIZE}rem`,
@@ -706,11 +732,18 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                       className={uiOffClass(!eqOn)}
                       style={{ display: 'inline-flex', transition: 'opacity 0.2s ease' }}
                     >
-                      <ChromeTextButton armed={eqPre} help={HELP.eqPre} onClick={handleToggleEqPre}>
+                      <ChromeTextButton
+                        armed={eqPre}
+                        pressed={eqPre}
+                        help={HELP.eqPre}
+                        onClick={handleToggleEqPre}
+                      >
                         PRE
                       </ChromeTextButton>
                     </span>
                     <div
+                      role="radiogroup"
+                      aria-label="EQ view"
                       style={{
                         ...segmentedGroupStyle(),
                         // Nested track, slightly quieter than the outer pill.
@@ -718,8 +751,11 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                       }}
                     >
                       <button
+                        type="button"
+                        role="radio"
+                        aria-checked={eqView === 'sliders'}
                         onClick={() => setEqView('sliders')}
-                        {...helpProps(HELP.eqSlidersView)}
+                        {...controlProps(HELP.eqSlidersView)}
                         style={{
                           ...segmentedCellStyle(true),
                           color: eqView === 'sliders' ? WHITE : GRAY,
@@ -728,8 +764,11 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                         <EqSlidersIcon />
                       </button>
                       <button
+                        type="button"
+                        role="radio"
+                        aria-checked={eqView === 'graph'}
                         onClick={() => setEqView('graph')}
-                        {...helpProps(HELP.eqCurveView)}
+                        {...controlProps(HELP.eqCurveView)}
                         style={{
                           ...segmentedCellStyle(true),
                           color: eqView === 'graph' ? WHITE : GRAY,
@@ -743,6 +782,7 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                 <ChromeTextButton
                   armed={eqActive}
                   open={showEq}
+                  expanded={showEq}
                   help={HELP.eqToggle}
                   onClick={() => {
                     setShowEq((prev) => !prev);
@@ -827,7 +867,11 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                     }}
                   >
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', minHeight: 0 }}>
-                      <BlockMeter meterId={meterId.blockIn(blockId)} length={RAIL_METER_HEIGHT} />
+                      <BlockMeter
+                        meterId={meterId.blockIn(blockId)}
+                        length={RAIL_METER_HEIGHT}
+                        label="Block input level"
+                      />
                     </div>
                     <KnobControl
                       label="In"
@@ -1124,7 +1168,11 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                         width: `${KNOB_SIZE_SECONDARY}rem`,
                       }}
                     >
-                      <BlockMeter meterId={meterId.blockOut(blockId)} length={RAIL_METER_HEIGHT} />
+                      <BlockMeter
+                        meterId={meterId.blockOut(blockId)}
+                        length={RAIL_METER_HEIGHT}
+                        label="Block output level"
+                      />
                     </div>
                     <div
                       style={{

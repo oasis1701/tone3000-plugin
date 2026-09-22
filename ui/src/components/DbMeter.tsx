@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useMeter, useMeterClip, meterId } from '../hooks/useMeters';
 import { METER_MAX_DB, METER_MIN_DB, getGradientColor } from './meterColor';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps } from './helpText';
 import { FONT_MONO, GRAY } from './theme';
 
 interface DbMeterProps {
@@ -33,43 +33,65 @@ const LABEL_COLOR = GRAY;
  * Each column subscribes to its own meter id, so a channel only re-renders
  * for its own (quantized) changes.
  */
-const DotColumn: React.FC<{ id: string; numDots: number }> = ({ id, numDots }) => {
+const DotColumn: React.FC<{ id: string; label: string; numDots: number }> = ({
+  id,
+  label,
+  numDots,
+}) => {
   const db = useMeter(id);
   const [clipped, clearClip] = useMeterClip(id);
 
+  // Dot i sits at an exact dB threshold on the label scale; the top dot is
+  // exactly 0 dBFS and doubles as the latching clip LED.
+  const position = (index: number) => (numDots > 1 ? index / (numDots - 1) : 0);
+  const dotDb = (index: number) => METER_MIN_DB + position(index) * (METER_MAX_DB - METER_MIN_DB);
+  const dotStyle = (index: number, active: boolean): React.CSSProperties => ({
+    width: `${DOT_SIZE}rem`,
+    height: `${DOT_SIZE}rem`,
+    borderRadius: '50%',
+    backgroundColor: getGradientColor(position(index)),
+    opacity: active ? 1 : 0.22,
+    flexShrink: 0,
+  });
+  const column: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column-reverse',
+    gap: `${DOT_GAP}rem`,
+    flexShrink: 0,
+  };
+  const clipIndex = numDots - 1;
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column-reverse',
-        gap: `${DOT_GAP}rem`,
-        flexShrink: 0,
-      }}
-    >
-      {Array.from({ length: numDots }, (_, index) => {
-        // Dot i sits at an exact dB threshold on the label scale; the top dot
-        // is exactly 0 dBFS and doubles as the latching clip LED.
-        const position = numDots > 1 ? index / (numDots - 1) : 0;
-        const dotDb = METER_MIN_DB + position * (METER_MAX_DB - METER_MIN_DB);
-        const isClipDot = index === numDots - 1;
-        const isActive = isClipDot ? clipped : db >= dotDb;
-        return (
-          <div
-            key={index}
-            onClick={isClipDot && clipped ? clearClip : undefined}
-            {...(isClipDot && clipped ? helpProps(HELP.clipDot) : {})}
-            style={{
-              width: `${DOT_SIZE}rem`,
-              height: `${DOT_SIZE}rem`,
-              borderRadius: '50%',
-              backgroundColor: getGradientColor(position),
-              opacity: isActive ? 1 : 0.22,
-              cursor: isClipDot && clipped ? 'pointer' : undefined,
-              flexShrink: 0,
-            }}
-          />
-        );
-      })}
+    // The level dots form an ARIA meter: a screen reader reads the level on
+    // demand ("Input level, -12 dB") and the live updates are never
+    // announced. The clip LED sits beside the meter rather than inside it (a
+    // meter's children are presentational), so that while latched it can be
+    // a real button that clears it. Same column-reverse stacking on both
+    // levels, so the layout is pixel-identical to one flat column.
+    <div style={column}>
+      <div
+        role="meter"
+        aria-label={label}
+        aria-valuemin={METER_MIN_DB}
+        aria-valuemax={METER_MAX_DB}
+        aria-valuenow={Math.round(Math.max(METER_MIN_DB, Math.min(METER_MAX_DB, db)))}
+        aria-valuetext={`${Math.round(Math.max(METER_MIN_DB, db))} dB${clipped ? ', clipped' : ''}`}
+        style={column}
+      >
+        {Array.from({ length: clipIndex }, (_, index) => (
+          <div key={index} style={dotStyle(index, db >= dotDb(index))} />
+        ))}
+      </div>
+      {clipped ? (
+        <button
+          type="button"
+          onClick={clearClip}
+          {...controlProps(HELP.clipDot, `${label} clipped, clear`)}
+          style={{ ...dotStyle(clipIndex, true), border: 'none', padding: 0, cursor: 'pointer' }}
+        />
+      ) : (
+        <div aria-hidden style={dotStyle(clipIndex, false)} />
+      )}
     </div>
   );
 };
@@ -94,6 +116,7 @@ export const DbMeter: React.FC<DbMeterProps> = ({
 
   const labels = (
     <div
+      aria-hidden
       style={{
         position: 'relative',
         height: `${actualMeterHeight}rem`,
@@ -125,7 +148,13 @@ export const DbMeter: React.FC<DbMeterProps> = ({
   );
 
   // One column subscribed to the combined level, or L/R columns per channel.
-  const columns = stereo ? [meterId.main(type, 'l'), meterId.main(type, 'r')] : [type];
+  const meterName = type === 'input' ? 'Input level' : 'Output level';
+  const columns = stereo
+    ? [
+        { id: meterId.main(type, 'l'), label: `${meterName} left` },
+        { id: meterId.main(type, 'r'), label: `${meterName} right` },
+      ]
+    : [{ id: type, label: meterName }];
 
   const dots = (
     <div
@@ -137,8 +166,8 @@ export const DbMeter: React.FC<DbMeterProps> = ({
         flexShrink: 0,
       }}
     >
-      {columns.map((id) => (
-        <DotColumn key={id} id={id} numDots={numDots} />
+      {columns.map(({ id, label }) => (
+        <DotColumn key={id} id={id} label={label} numDots={numDots} />
       ))}
     </div>
   );

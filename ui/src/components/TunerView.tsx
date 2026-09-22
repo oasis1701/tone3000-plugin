@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X as XIcon } from './icons';
 import { useNativeFunction } from '../hooks/useFunction';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import {
   BRAND_BLUE,
   BRAND_RED,
@@ -191,8 +192,17 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     />
   );
 
+  // Keyboard: focus returns to the tuner button when the takeover closes;
+  // Escape closes it.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, onClose);
+
   return (
     <div
+      ref={rootRef}
+      role="dialog"
+      aria-label="Tuner"
       style={{
         position: 'relative',
         flex: 1,
@@ -207,8 +217,11 @@ export const TunerView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     >
       {/* Redundant close affordance mirroring Settings' top-right X. */}
       <button
+        type="button"
         onClick={onClose}
         aria-label="Close tuner"
+        // The takeover opens with the keyboard inside it.
+        autoFocus
         style={{
           position: 'absolute',
           top: '16rem',

@@ -71,6 +71,19 @@ const disarmFileDrag = (e: React.DragEvent, setArmed: (v: boolean) => void) => {
     focused element into view, which nudges the whole lane by a pixel. */
 const preventFocus = (e: React.MouseEvent) => e.preventDefault();
 
+/**
+ * Enter on the tile itself (not a button inside it) acts like a click. The
+ * tile is the sortable's activator: dnd-kit makes it a focusable button and
+ * describes its keys to screen readers (see ChainView's plugins); Space
+ * picks it up for reordering, Enter opens it. Shift+F10 / the Menu key raise
+ * the same context menu as a right-click (Chromium fires `contextmenu`).
+ */
+const onEnterKey = (action: () => void) => (e: React.KeyboardEvent<HTMLDivElement>) => {
+  if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+  e.preventDefault();
+  action();
+};
+
 /** Right-click → tile-local anchor for the tile's action sheet (suppresses
     the OS context menu; macOS ctrl-click lands here too). Ctrl-click also
     fires a synthetic `click` after `contextmenu`; `shouldIgnoreClick`
@@ -230,9 +243,10 @@ const localLoadMenuItems = (
   ];
 };
 
-/** Interactive wiring for a tile's chrome. */
+/** Interactive wiring for a tile's chrome. Opening the tile is the sortable
+    wrapper's own click / Enter (GalleryBlock), so a screen reader's
+    "activate" on the tile button lands there. */
 interface TileActions {
-  onOpen: (e: React.MouseEvent) => void;
   onTogglePower: (e: React.MouseEvent) => void;
   onSwap: (e: React.MouseEvent) => void;
   onRemove: (e: React.MouseEvent) => void;
@@ -277,7 +291,6 @@ const TileSurface: React.FC<{
         // Header reveals on :hover via CSS (see index.css), since JS hover state
         // dies across drag re-renders. The traveling tile pins it visible.
         className={dragging ? 'gallery-tile tile-chrome-visible' : 'gallery-tile'}
-        onClick={actions.onOpen}
         {...helpProps(toneTileHelp(tone.title))}
         style={{
           width: `${size}rem`,
@@ -480,9 +493,26 @@ export const GalleryBlock: React.FC<GalleryBlockProps> = React.memo(
       if (error) toast.show(error);
     };
 
+    const open = () => onOpen(blockId);
+    // Accessible name: the tone, plus any state a sighted user reads off the
+    // artwork (dimmed = bypassed, dots = loading, badge = failed).
+    const busy = block.modelLoading || (!block.loaded && !block.loadFailed);
+    const tileLabel = `${block.tone.title}${enabled ? '' : ', bypassed'}${
+      block.loadFailed ? ', load failed' : busy ? ', loading' : ''
+    }`;
+
     return (
       <div
         ref={ref}
+        // The shell's own keyboard focus reveals the action strip (index.css).
+        className="gallery-tile-shell"
+        role="button"
+        aria-label={tileLabel}
+        onClick={(e) => {
+          if (shouldIgnoreClick(e)) return;
+          open();
+        }}
+        onKeyDown={onEnterKey(open)}
         onContextMenu={openMenu}
         {...longPressProps}
         onDragOver={(e) => armFileDrag(e, setDropArmed)}
@@ -506,10 +536,6 @@ export const GalleryBlock: React.FC<GalleryBlockProps> = React.memo(
           dragging={isDragging}
           dropArmed={dropArmed}
           actions={{
-            onOpen: (e) => {
-              if (shouldIgnoreClick(e)) return;
-              onOpen(blockId);
-            },
             onTogglePower: handleTogglePower,
             onSwap: (e) => {
               e.stopPropagation();
@@ -639,10 +665,13 @@ export const AddTile: React.FC<AddTileProps> = ({
   return (
     <div
       ref={ref}
+      role="button"
+      aria-label="Add Tone"
       onClick={(e) => {
         if (shouldIgnoreClick(e)) return;
         onClick();
       }}
+      onKeyDown={onEnterKey(onClick)}
       onContextMenu={openMenu}
       {...longPressProps}
       onDragOver={(e) => armFileDrag(e, setDropArmed)}

@@ -57,32 +57,38 @@ export const ToastProvider: React.FC<{
   return (
     <ToastContext.Provider value={control}>
       {children}
-      {message !== null && (
-        // Keyed by text so a replacement message re-runs the entrance.
-        <div
-          key={message}
-          style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: `${bottom}rem`,
-            transform: 'translateX(-50%)',
-            backgroundColor: WHITE,
-            color: BLACK,
-            fontSize: '16rem',
-            fontWeight: 700,
-            lineHeight: 1,
-            padding: '14rem 24rem',
-            borderRadius: '16rem',
-            whiteSpace: 'nowrap',
-            zIndex: 1000,
-            pointerEvents: 'none',
-            animation: 'toast-in 0.16s ease-out',
-          }}
-        >
-          <style>{`@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 6rem); } }`}</style>
-          {message}
-        </div>
-      )}
+      {/* Always-mounted live region: a screen reader only announces text
+          that appears inside a region it already knows about, so the
+          `role="status"` wrapper stays in the tree and the pill comes and
+          goes inside it. */}
+      <div role="status" aria-live="polite">
+        {message !== null && (
+          // Keyed by text so a replacement message re-runs the entrance.
+          <div
+            key={message}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: `${bottom}rem`,
+              transform: 'translateX(-50%)',
+              backgroundColor: WHITE,
+              color: BLACK,
+              fontSize: '16rem',
+              fontWeight: 700,
+              lineHeight: 1,
+              padding: '14rem 24rem',
+              borderRadius: '16rem',
+              whiteSpace: 'nowrap',
+              zIndex: 1000,
+              pointerEvents: 'none',
+              animation: 'toast-in 0.16s ease-out',
+            }}
+          >
+            <style>{`@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 6rem); } }`}</style>
+            {message}
+          </div>
+        )}
+      </div>
     </ToastContext.Provider>
   );
 };

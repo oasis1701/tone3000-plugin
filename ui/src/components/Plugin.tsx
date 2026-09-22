@@ -468,6 +468,7 @@ export const Plugin: React.FC = () => {
           <TunerView onClose={closeTuner} />
         ) : (
           <div
+            role="main"
             style={{
               display: 'flex',
               flexDirection: 'row',

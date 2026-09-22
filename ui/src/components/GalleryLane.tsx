@@ -8,7 +8,7 @@ import { panScale } from './knobScale';
 const PAN_LEFT_SCALE = panScale('left');
 const PAN_RIGHT_SCALE = panScale('right');
 import { ChromeIconButton } from './ChromeIconButton';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps, helpProps } from './helpText';
 import {
   BLACK,
   BORDER,
@@ -323,10 +323,22 @@ const PanRailChips: React.FC<{
   });
   return (
     <div style={segmentedGroupStyle()}>
-      <button type="button" onClick={onSolo} {...helpProps(soloHelp)} style={cell(solo)}>
+      <button
+        type="button"
+        onClick={onSolo}
+        aria-pressed={solo}
+        {...controlProps(soloHelp)}
+        style={cell(solo)}
+      >
         <span className="cap-trim">S</span>
       </button>
-      <button type="button" onClick={onInvert} {...helpProps(invertHelp)} style={cell(invert)}>
+      <button
+        type="button"
+        onClick={onInvert}
+        aria-pressed={invert}
+        {...controlProps(invertHelp)}
+        style={cell(invert)}
+      >
         <span className="cap-trim">Ø</span>
       </button>
     </div>

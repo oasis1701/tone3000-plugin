@@ -119,6 +119,36 @@ export const useHelpText = () => useSyncExternalStore(subscribe, snapshot);
 /** Spread onto any element to drive the readout from hover. */
 export const helpProps = (text: string) => ({ [HELP_ATTR]: text });
 
+// --- accessible names -------------------------------------------------------
+
+// Every help line starts with the control's name (`Name: what it does.`),
+// so the same copy that feeds the hover readout can name the control for
+// assistive technology. Icon-only buttons otherwise have no accessible name
+// at all: a screen reader announces them as just "button".
+
+/** The control's name: the `Name:` prefix of a help line. */
+export const helpName = (text: string): string => {
+  const colon = text.indexOf(':');
+  return colon > 0 ? text.slice(0, colon).trim() : text;
+};
+
+/** The rest of a help line after the name, for the accessible description. */
+export const helpDescription = (text: string): string => {
+  const colon = text.indexOf(':');
+  return colon > 0 ? text.slice(colon + 1).trim() : text;
+};
+
+/**
+ * Spread onto a button or other control: hover hint plus `aria-label` and
+ * `aria-description`. Pass `label` when the help line's prefix isn't the
+ * right name (e.g. a name that should carry the current state).
+ */
+export const controlProps = (help: string, label?: string) => ({
+  ...helpProps(help),
+  'aria-label': label ?? helpName(help),
+  'aria-description': helpDescription(help),
+});
+
 // --- visibility preference ---------------------------------------------------
 
 // Whether the hint bar shows at all. A per-machine UI preference, not part
@@ -163,9 +193,14 @@ const alt = chord('\u2325', 'Alt');
 /** Shared legend for every KnobControl (they all support these gestures).
     Touch has no modifier keys and no separate click button, so it gets the
     gestures it actually has (see KnobControl). */
-const KNOB_KEYS = IS_COARSE_POINTER
+export const KNOB_KEYS = IS_COARSE_POINTER
   ? 'drag up or down: adjust · double tap: reset · tap the name: type'
   : `${shift('drag')}: fine · double-click: type · ${alt('click')}: reset`;
+
+/** The keyboard legend a focused knob describes to assistive technology
+    (see KnobControl's key handling), in place of the pointer gestures. */
+export const KNOB_KEYBOARD_LEGEND =
+  'Arrow keys: adjust · Shift+arrows: fine · Page Up/Down: coarse · Home/End: min/max · Enter: type a value · Delete: reset';
 
 export const knobHelp = (name: string, desc: string) => `${name}: ${desc} ${KNOB_KEYS}`;
 

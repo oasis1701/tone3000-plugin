@@ -99,13 +99,18 @@ svg {
   text-box: trim-both cap alphabetic;
 }
 
-/* Remove focus highlight for knobs */
-.knob:focus {
-  outline: none;
-  box-shadow: none;
+/* Keyboard focus ring. `:focus-visible` only: a mouse click on a button
+   never shows it (Chromium's heuristic), while Tab, arrows and screen-reader
+   navigation do, so sighted keyboard users can see where they are. The
+   outline follows border-radius, so it rounds on knobs and pills. No
+   component sets an inline `outline: none` any more; this is the one rule. */
+:focus-visible {
+  outline: 2rem solid #ffffff;
+  outline-offset: 2rem;
 }
 
-.knob:focus-visible {
+/* A knob keeps its ring but never the mouse-press one. */
+.knob:focus:not(:focus-visible) {
   outline: none;
   box-shadow: none;
 }
@@ -148,7 +153,12 @@ body.dragging {
   transition: opacity 0.15s ease;
   pointer-events: none;
 }
+/* Keyboard too: the strip's power / swap / remove buttons are in the tab
+   order, so it shows while the tile itself (the focusable sortable shell)
+   has keyboard focus and while Tab is on one of the buttons inside. */
 .gallery-tile:hover .tile-chrome,
+.gallery-tile:focus-within .tile-chrome,
+.gallery-tile-shell:focus-visible .tile-chrome,
 .gallery-tile.tile-chrome-visible .tile-chrome {
   opacity: 1;
   pointer-events: auto;
@@ -171,7 +181,8 @@ body.dragging {
   opacity: 0;
   transition: opacity 0.15s ease;
 }
-.branch-gap:hover .branch-gap-button {
+.branch-gap:hover .branch-gap-button,
+.branch-gap:focus-within .branch-gap-button {
   opacity: 1;
 }
 

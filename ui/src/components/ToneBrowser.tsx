@@ -16,9 +16,10 @@ import { AvatarImage } from './AvatarFallback';
 import { FormatBadge } from './FormatBadge';
 import { GearIcon, ToneImage } from './GearIcon';
 import { BusyOverlay, LoadingDots } from './LoadingDots';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps } from './helpText';
 import { EdgeFade, EDGE_FADE_WIDTH } from './GalleryLane';
 import { useHorizontalWheelScroll } from '../hooks/useHorizontalWheelScroll';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { CARD_WIDTH } from './chainLayout';
 import { T3kMark } from './T3kMark';
 import {
@@ -298,7 +299,20 @@ const ToneCard: React.FC<{
   onPick: () => void;
 }> = ({ tone, loading, disabled, onPick }) => (
   <div
+    // A focusable button for the keyboard and screen readers; the name
+    // carries what the card shows (title, gear, creator).
+    role="button"
+    tabIndex={0}
+    aria-disabled={disabled || undefined}
+    aria-label={[tone.title, gearLabel(tone.gear), tone.user?.username].filter(Boolean).join(', ')}
     onClick={disabled ? undefined : onPick}
+    onKeyDown={(e) => {
+      if (disabled || e.target !== e.currentTarget) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onPick();
+      }
+    }}
     style={{
       position: 'relative',
       width: '100%',
@@ -567,6 +581,10 @@ export const ToneBrowser: React.FC<ToneBrowserProps> = ({
   const [pickingId, setPickingId] = useState<number | null>(null);
   const [pickError, setPickError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Keyboard: focus returns to the tile / + that opened the browser when it
+  // closes; Escape closes it.
+  useRestoreFocus(scrollRef);
+  useEscapeToClose(scrollRef, onClose);
 
   const showSignInPrompt = GATED_STREAMS.has(stream) && !authenticated;
 
@@ -752,6 +770,8 @@ export const ToneBrowser: React.FC<ToneBrowserProps> = ({
     <div
       ref={scrollRef}
       className="hide-scrollbar"
+      role="dialog"
+      aria-label="Select tone"
       style={{
         height: '100%',
         overflowY: 'auto',
@@ -810,14 +830,15 @@ export const ToneBrowser: React.FC<ToneBrowserProps> = ({
             <button
               type="button"
               onClick={onClose}
-              {...helpProps(HELP.closeToneBrowser)}
+              // The takeover opens with the keyboard inside it.
+              autoFocus
+              {...controlProps(HELP.closeToneBrowser, 'Back to the chain')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16rem',
                 background: 'transparent',
                 border: 'none',
-                outline: 'none',
                 padding: 0,
                 margin: 0,
                 cursor: 'pointer',

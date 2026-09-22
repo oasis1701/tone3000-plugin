@@ -159,7 +159,6 @@ const EditableChip: React.FC<{
             fontSize: '12rem',
             fontFamily: FONT_MONO,
             textAlign: 'left',
-            outline: 'none',
             padding: 0,
           }}
         />

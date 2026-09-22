@@ -129,7 +129,6 @@ export const filledPillButtonStyle: CSSProperties = {
 export const iconButtonStyle = (size = ICON_BOX_SIZE): CSSProperties => ({
   background: 'transparent',
   border: '1rem solid transparent',
-  outline: 'none',
   color: MUTED,
   cursor: 'pointer',
   width: `${size}rem`,

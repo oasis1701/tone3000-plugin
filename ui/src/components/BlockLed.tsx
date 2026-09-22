@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMeter, useMeterClip } from '../hooks/useMeters';
 import { METER_MAX_DB, METER_MIN_DB } from './meterColor';
-import { HELP, helpProps } from './helpText';
+import { HELP, controlProps } from './helpText';
 
 interface BlockLedProps {
   /** Meter id from useMeters (e.g. meterId.blockOut(blockId)). */
@@ -80,16 +80,19 @@ export const BlockLed: React.FC<BlockLedProps> = React.memo(function BlockLed({
   if (!clipped) return null;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={(e) => {
         e.stopPropagation();
         clearClip();
       }}
-      {...helpProps(HELP.clipDot)}
+      {...controlProps(HELP.clipDot, 'Clipped, clear')}
       style={{
         width: `${size}rem`,
         height: `${size}rem`,
         borderRadius: '50%',
+        border: 'none',
+        padding: 0,
         backgroundColor: 'rgb(255, 0, 0)',
         cursor: 'pointer',
         flexShrink: 0,
@@ -128,6 +131,7 @@ export const BlockEnergyBorder: React.FC<BlockEnergyBorderProps> = React.memo(
 
     return (
       <div
+        aria-hidden
         style={{
           position: 'absolute',
           inset: 0,

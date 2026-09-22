@@ -160,6 +160,31 @@ land in `build/plugin/TONE3000_artefacts/<config>/<format>/`.
 | Linux   | LV2    | `~/.lv2/`                               |
 | Linux   | CLAP   | `~/.clap/`                              |
 
+## Keyboard and screen reader access
+
+The web UI is operable without a mouse and exposes every control to
+assistive technology (built for NVDA on Windows, where WebView2 presents the
+page to screen readers the same way Edge does; testing with other screen
+readers and platforms is welcome). The standalone puts keyboard focus on the
+UI as soon as it loads; in a host, the UI takes focus whenever the host gives
+its plugin window focus, and never grabs it on its own (the host's transport
+keys stay with the host, see `ui/src/keyPassthrough.ts`).
+
+- **Tab / Shift+Tab** move through every control in reading order. Every
+  icon button is named after its help line (`Undo`, `Power`, `Swap`); toggles
+  report their state; the tone tiles are named after the tone.
+- **Knobs** are sliders: arrow keys step 1%, Shift+arrows 0.1%, Page Up/Down
+  10%, Home/End the ends, Enter opens the type-in editor, Delete resets to
+  the default. The value is read in real units (dB, ms, Hz).
+- **Chain tiles**: Enter opens a tile, Space picks it up and the arrow keys
+  move it (Space drops, Escape cancels), Shift+F10 opens its right-click
+  menu.
+- **Menus, pickers and takeovers** (account, input mode, model select,
+  settings, tone browser, tuner, block card) move focus inside on open and
+  close on Escape.
+- **Meters** are readable on demand as level values; they never announce on
+  their own. A latched clip LED is a button that clears it.
+
 ## Linux runtime dependencies
 
 Windows statically links only the WebView2 loader (the Evergreen Runtime is

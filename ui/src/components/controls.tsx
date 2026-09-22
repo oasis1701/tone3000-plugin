@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useContext, useRef, useState } from 'react';
 import { ChevronDown } from './icons';
 import { useDismissable } from '../hooks/useDismissable';
 import { MUTED, SUBTLE, BRAND_RED, BRAND_YELLOW, WHITE } from './theme';
@@ -22,9 +22,16 @@ export const outlinedFieldStyle: React.CSSProperties = {
   color: '#ffffff',
   fontSize: '14rem',
   fontWeight: 400,
-  outline: 'none',
   boxSizing: 'border-box',
 };
+
+/**
+ * The label of the enclosing FieldRow / ToggleRow. The control inside (pill
+ * switch, custom select) reads it as its accessible name, so a screen
+ * reader hears "Output Device, combo box" without every call site repeating
+ * the text. An explicit `ariaLabel` prop still wins.
+ */
+const FieldLabelContext = React.createContext<string | undefined>(undefined);
 
 // Only headers carry weight; everything else is regular (the app's global
 // stylesheet defaults heavier, so body copy sets 400 explicitly).
@@ -114,45 +121,51 @@ export const captionStyle: React.CSSProperties = {
 
 /** Green pill switch mirroring the web ToggleSimple: 40×24 track (zinc-500
     off, #00D13B on), 16px white knob with a 4px inset, 300ms ease. */
-export const PillToggle: React.FC<{ value: boolean; onChange: (value: boolean) => void }> = ({
-  value,
-  onChange,
-}) => (
-  <button
-    role="switch"
-    aria-checked={value}
-    onClick={() => onChange(!value)}
-    style={{
-      position: 'relative',
-      width: '40rem',
-      height: '24rem',
-      borderRadius: '12rem',
-      border: 'none',
-      padding: 0,
-      cursor: 'pointer',
-      backgroundColor: value ? '#00D13B' : '#71717a',
-      boxShadow: 'inset 0 2rem 4rem rgba(0, 0, 0, 0.15)',
-      flexShrink: 0,
-      transition: 'background-color 0.3s ease-in-out',
-    }}
-  >
-    <span
+export const PillToggle: React.FC<{
+  value: boolean;
+  onChange: (value: boolean) => void;
+  ariaLabel?: string;
+}> = ({ value, onChange, ariaLabel }) => {
+  const fieldLabel = useContext(FieldLabelContext);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={ariaLabel ?? fieldLabel}
+      onClick={() => onChange(!value)}
       style={{
-        position: 'absolute',
-        top: '4rem',
-        left: '4rem',
-        width: '16rem',
-        height: '16rem',
-        borderRadius: '50%',
-        backgroundColor: '#ffffff',
-        boxShadow: '0 1rem 2rem rgba(0, 0, 0, 0.3)',
-        transform: value ? 'translateX(16rem)' : 'translateX(0)',
-        transition: 'transform 0.3s ease-in-out',
-        display: 'block',
+        position: 'relative',
+        width: '40rem',
+        height: '24rem',
+        borderRadius: '12rem',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        backgroundColor: value ? '#00D13B' : '#71717a',
+        boxShadow: 'inset 0 2rem 4rem rgba(0, 0, 0, 0.15)',
+        flexShrink: 0,
+        transition: 'background-color 0.3s ease-in-out',
       }}
-    />
-  </button>
-);
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: '4rem',
+          left: '4rem',
+          width: '16rem',
+          height: '16rem',
+          borderRadius: '50%',
+          backgroundColor: '#ffffff',
+          boxShadow: '0 1rem 2rem rgba(0, 0, 0, 0.3)',
+          transform: value ? 'translateX(16rem)' : 'translateX(0)',
+          transition: 'transform 0.3s ease-in-out',
+          display: 'block',
+        }}
+      />
+    </button>
+  );
+};
 
 /** Custom dropdown select styled like the plugin's other pickers: outlined
     trigger, dark panel, hover-highlight rows. Renders disabled (dimmed, no
@@ -181,17 +194,47 @@ export function SelectField<T extends string>({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // Closing hands the keyboard back to the trigger when it was inside the
+  // list (Escape, or a row that is about to unmount); an outside click that
+  // lands on another control keeps that control's focus.
+  const close = useCallback(() => {
+    setOpen(false);
+    if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+  }, []);
   useDismissable(open, rootRef, close);
+  const fieldLabel = useContext(FieldLabelContext);
+  const name = ariaLabel ?? fieldLabel;
 
   const selected = options.find((option) => option.value === value);
+  // Keyboard focus opens on the current option (or the first), so a picked
+  // value is one Enter away; arrows walk the rows, and a pick or Escape
+  // returns focus to the trigger.
+  const focusedValue = selected?.value ?? options[0]?.value;
+  const pick = (next: T) => {
+    onChange(next);
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    const index = rows.indexOf(document.activeElement as HTMLButtonElement);
+    const next = rows[(index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length];
+    next?.focus();
+  };
 
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
-        aria-label={ariaLabel}
+        aria-label={name}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         style={{
           ...outlinedFieldStyle,
           width: '100%',
@@ -221,6 +264,9 @@ export function SelectField<T extends string>({
       {open && (
         <div
           className="hide-scrollbar"
+          role="listbox"
+          aria-label={name}
+          onKeyDown={handleListKeyDown}
           style={{
             position: 'absolute',
             top: 'calc(100% + 4rem)',
@@ -235,12 +281,13 @@ export function SelectField<T extends string>({
           }}
         >
           {options.map((option) => (
-            <div
+            <button
               key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              autoFocus={option.value === focusedValue}
+              onClick={() => pick(option.value)}
               onMouseEnter={(e) => {
                 if (option.value !== value)
                   e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
@@ -249,11 +296,16 @@ export function SelectField<T extends string>({
                 if (option.value !== value) e.currentTarget.style.background = 'transparent';
               }}
               style={{
+                display: 'block',
+                width: '100%',
+                border: 'none',
+                textAlign: 'left',
                 padding: '12rem 16rem',
                 cursor: 'pointer',
                 color: '#ffffff',
                 fontSize: '14rem',
                 fontWeight: 400,
+                fontFamily: 'inherit',
                 // No dividers between rows; only the active/hover fill and the
                 // container border delineate options.
                 background: option.value === value ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
@@ -273,7 +325,7 @@ export function SelectField<T extends string>({
                   {option.sublabel}
                 </span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -298,7 +350,7 @@ export const FieldRow: React.FC<{
     </div>
     {help && <p style={{ ...descriptionStyle, marginBottom: '16rem' }}>{help}</p>}
     {!help && <div style={{ height: '16rem' }} />}
-    {children}
+    <FieldLabelContext.Provider value={label}>{children}</FieldLabelContext.Provider>
   </div>
 );
 
@@ -321,7 +373,7 @@ export const ToggleRow: React.FC<{
       }}
     >
       <span style={sectionLabelStyle}>{label}</span>
-      <PillToggle value={value} onChange={onChange} />
+      <PillToggle value={value} onChange={onChange} ariaLabel={label} />
     </div>
     <p style={{ ...descriptionStyle, margin: '4rem 0 0' }}>{description}</p>
     {/* 16rem between the help line and any expanded controls / tips. */}

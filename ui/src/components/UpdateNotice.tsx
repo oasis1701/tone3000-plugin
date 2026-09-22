@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { X } from './icons';
 import type { UpdateNoticeData } from '../hooks/useUpdateNotice';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { BORDER, MUTED, SURFACE, filledPillButtonStyle, iconButtonStyle } from './theme';
 
 interface UpdateNoticeProps {
@@ -50,8 +51,27 @@ export const UpdateNotice: React.FC<UpdateNoticeProps> = ({ notice, onRemindLate
   if (!notice) return null;
 
   return (
+    <UpdateNoticeBody notice={notice} messageHtml={messageHtml} onRemindLater={onRemindLater} />
+  );
+};
+
+/** Mounted only while a notice is up: the download action takes focus as
+    the dialog appears, Escape is "remind me later", and closing hands focus
+    back to what the user was on. */
+const UpdateNoticeBody: React.FC<{
+  notice: UpdateNoticeData;
+  messageHtml: string;
+  onRemindLater: (days: number) => void;
+}> = ({ notice, messageHtml, onRemindLater }) => {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, () => onRemindLater(DISMISS_DAYS));
+
+  return (
     <div
+      ref={rootRef}
       role="dialog"
+      aria-modal="true"
       aria-label="Plugin update available"
       style={{
         position: 'absolute',
@@ -111,6 +131,7 @@ export const UpdateNotice: React.FC<UpdateNoticeProps> = ({ notice, onRemindLate
           href={notice.url}
           target="_blank"
           rel="noopener noreferrer"
+          autoFocus
           style={{ ...filledPillButtonStyle, textDecoration: 'none' }}
         >
           Download update

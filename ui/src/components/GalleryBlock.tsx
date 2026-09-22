@@ -121,8 +121,20 @@ const useTileMenu = () => {
     e.stopPropagation();
     suppressClickUntilRef.current = performance.now() + SUPPRESS_CLICK_MS;
     // Viewport coords: TileMenu portals to body and positions with
-    // position:fixed at these real-px coordinates.
-    setMenuAnchor({ clientX: e.clientX, clientY: e.clientY });
+    // position:fixed at these real-px coordinates. A keyboard-opened menu
+    // (Shift+F10 / Menu key) carries no useful pointer position, so it
+    // anchors a little inside the tile's top-left corner instead.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fromPointer =
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom;
+    setMenuAnchor(
+      fromPointer
+        ? { clientX: e.clientX, clientY: e.clientY }
+        : { clientX: rect.left + 24, clientY: rect.top + 24 }
+    );
   }, []);
   const closeMenu = useCallback(() => setMenuAnchor(null), []);
 

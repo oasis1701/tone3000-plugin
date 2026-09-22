@@ -1,7 +1,30 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { OAuthPhase } from '../hooks/useT3kSelect';
 import { LoadingDots } from './LoadingDots';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { filledPillButtonStyle, pillButtonStyle } from './theme';
+
+/** The error state's actions: "Try again" takes focus as they appear so a
+    screen reader announces the failure, Escape dismisses, and closing hands
+    focus back to what the user was on. */
+const ErrorActions: React.FC<{ onRetry: () => void; onDismiss: () => void }> = ({
+  onRetry,
+  onDismiss,
+}) => {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, onDismiss);
+  return (
+    <div ref={rootRef} style={{ display: 'flex', gap: '12rem' }}>
+      <button type="button" onClick={onRetry} autoFocus style={filledPillButtonStyle}>
+        Try again
+      </button>
+      <button type="button" onClick={onDismiss} style={pillButtonStyle}>
+        Dismiss
+      </button>
+    </div>
+  );
+};
 
 interface OAuthOverlayProps {
   phase: OAuthPhase;
@@ -51,14 +74,7 @@ export const OAuthOverlay: React.FC<OAuthOverlayProps> = ({ phase, error, onRetr
           <div style={{ fontSize: '14rem', fontWeight: 400, opacity: 0.95, maxWidth: '360rem' }}>
             {error ?? 'Something went wrong completing TONE3000 sign-in.'}
           </div>
-          <div style={{ display: 'flex', gap: '12rem' }}>
-            <button type="button" onClick={onRetry} style={filledPillButtonStyle}>
-              Try again
-            </button>
-            <button type="button" onClick={onDismiss} style={pillButtonStyle}>
-              Dismiss
-            </button>
-          </div>
+          <ErrorActions onRetry={onRetry} onDismiss={onDismiss} />
         </>
       )}
     </div>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ShieldAlert, WifiOff } from './icons';
 import { isNativeFunctionRegistered } from '../backend/JuceBackend';
 import { useAudioBackend } from '../hooks/useAudioBackend';
+import { useEscapeToClose, useRestoreFocus } from '../hooks/useTakeoverFocus';
 import type { ConnectionProblem } from '../hooks/useConnectionGate';
 import { filledPillButtonStyle, pillButtonStyle } from './theme';
 
@@ -26,21 +27,34 @@ interface ConnectionModalProps {
  * Same full-window scrim + button language as OAuthOverlay so the error
  * surfaces read as one system. Rendered after OAuthOverlay at the same
  * z-index, so the diagnosis stacks above a stranded OAuth page.
+ *
+ * Keyboard: the primary action takes focus as the modal appears (a screen
+ * reader then announces the dialog and its text), Escape dismisses, and
+ * closing hands focus back to the control that triggered it.
  */
-export const ConnectionModal: React.FC<ConnectionModalProps> = ({
-  problem,
-  onRetry,
-  onDismiss,
-}) => {
+export const ConnectionModal: React.FC<ConnectionModalProps> = ({ problem, onRetry, onDismiss }) =>
+  problem ? (
+    <ConnectionModalBody problem={problem} onRetry={onRetry} onDismiss={onDismiss} />
+  ) : null;
+
+const ConnectionModalBody: React.FC<{
+  problem: ConnectionProblem;
+  onRetry: () => void;
+  onDismiss: () => void;
+}> = ({ problem, onRetry, onDismiss }) => {
   const backend = useAudioBackend();
-  if (!problem) return null;
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useRestoreFocus(rootRef);
+  useEscapeToClose(rootRef, onDismiss);
 
   const offline = problem === 'offline';
   const canOpenClockSettings = !offline && isNativeFunctionRegistered('openDateTimeSettings');
 
   return (
     <div
+      ref={rootRef}
       role="alertdialog"
+      aria-modal="true"
       aria-label={offline ? 'No internet connection' : 'Secure connection failed'}
       style={{
         position: 'absolute',
@@ -73,7 +87,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             'security software can also block the plugin.'}
       </div>
       <div style={{ display: 'flex', gap: '12rem' }}>
-        <button type="button" onClick={onRetry} style={filledPillButtonStyle}>
+        <button type="button" onClick={onRetry} autoFocus style={filledPillButtonStyle}>
           Try again
         </button>
         {canOpenClockSettings && (

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { helpProps } from './helpText';
 import { useDismissable } from '../hooks/useDismissable';
+import { useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { BORDER, DISABLED_OPACITY, HIGHLIGHT, MUTED, WHITE } from './theme';
 
 /**
@@ -13,6 +14,12 @@ import { BORDER, DISABLED_OPACITY, HIGHLIGHT, MUTED, WHITE } from './theme';
  * coords (numeric left/top = real px; the rem-denominated sizes scale with
  * the UI like everything else). Dismissed on outside press, Escape, or
  * picking a row.
+ *
+ * Keyboard: Shift+F10 / the Menu key open it like a right-click (Chromium
+ * fires `contextmenu` for them). Because the portal lands at the end of the
+ * document, the menu takes focus as soon as it opens; a screen reader would
+ * otherwise never find it. Arrows / Home / End walk the rows, Enter picks,
+ * Escape closes, and closing hands focus back to the tile that opened it.
  */
 
 export interface TileMenuItem {
@@ -43,6 +50,7 @@ export const TileMenu: React.FC<{
   const rootRef = useRef<HTMLDivElement>(null);
 
   useDismissable(true, rootRef, onClose);
+  useRestoreFocus(rootRef);
 
   // A resize reflows the content under the fixed menu: just dismiss;
   // keeping it at the old client point would look wrong anyway.
@@ -51,13 +59,44 @@ export const TileMenu: React.FC<{
     return () => window.removeEventListener('resize', onClose);
   }, [onClose]);
 
+  const firstEnabled = items.findIndex((item) => !item.disabled);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Every key inside the menu is the menu's. React bubbles portal events
+    // to the tile's handlers (and dnd-kit's), so stop them here; Escape is
+    // handled directly for the same reason (the document-level dismiss
+    // listener would not see it).
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+    e.preventDefault();
+    const rows = Array.from(
+      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+    );
+    if (rows.length === 0) return;
+    const index = rows.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? rows.length - 1
+          : (index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+    rows[next].focus();
+  };
+
   return createPortal(
     <div
       ref={rootRef}
+      role="menu"
       // Keep every gesture inside the panel: clicks must not open the tile's
       // detail view, presses must not arm a drag under the menu.
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={handleKeyDown}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -78,12 +117,15 @@ export const TileMenu: React.FC<{
       }}
     >
       <style>{`.tile-menu-item:hover:not(:disabled) { background-color: ${HIGHLIGHT}; }`}</style>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <button
           key={item.label}
           type="button"
+          role="menuitem"
           className="tile-menu-item"
           disabled={item.disabled}
+          // The keyboard lands on the first usable row as the menu opens.
+          autoFocus={index === firstEnabled}
           {...helpProps(item.help)}
           onClick={() => {
             onClose();

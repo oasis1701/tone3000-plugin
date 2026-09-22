@@ -1,5 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Power } from './icons';
+import { useRestoreFocus } from '../hooks/useTakeoverFocus';
 import { KnobControl } from './KnobControl';
 import { crossoverHzScale, percentScale } from './knobScale';
 import type { KnobScale } from './knobScale';
@@ -193,9 +194,31 @@ export const ImageDeckPanel = React.forwardRef<
   const [crossover, setCrossover, onCrossoverDrag] = useParameter(`${feature}Crossover`, 'slider');
   const [crossoverOn, setCrossoverOn] = useParameter(`${feature}CrossoverEnabled`, 'toggle');
   const [diffuseOn, setDiffuseOn] = useParameter(`${feature}DiffuseEnabled`, 'toggle');
+
+  // Keyboard: the panel opens from Shift+F10 on the Offset knob (Chromium's
+  // keyboard route to `contextmenu`), so the keyboard moves onto its first
+  // control as it appears, a screen reader announces the group, and closing
+  // (Escape / outside press, see the owner's useDismissable) hands focus
+  // back to the knob. The forwarded ref stays the owner's dismiss anchor.
+  const localRef = useRef<HTMLDivElement | null>(null);
+  const setRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      localRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref]
+  );
+  useRestoreFocus(localRef);
+  useEffect(() => {
+    localRef.current?.querySelector<HTMLElement>('[tabindex], button')?.focus();
+  }, []);
+
   return (
     <div
-      ref={ref}
+      ref={setRefs}
+      role="group"
+      aria-label={`${feature === 'spread' ? 'Spread' : 'Align'} advanced`}
       style={{
         position: 'absolute',
         // Splits the difference down toward the knob's top edge instead of

@@ -184,6 +184,10 @@ keys stay with the host, see `ui/src/keyPassthrough.ts`).
   close on Escape.
 - **Meters** are readable on demand as level values; they never announce on
   their own. A latched clip LED is a button that clears it.
+- **Tuner**: the note and its offset in cents are spoken as they change
+  ("E2, 7 cents flat", "E2, in tune"), as live as the bars; the exact
+  reading with frequency is one Tab away for reading on demand. Plugin
+  Settings > Tuner Announcements turns the spoken updates off.
 
 ## Linux runtime dependencies
 

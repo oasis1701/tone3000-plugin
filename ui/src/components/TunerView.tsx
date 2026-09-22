@@ -41,28 +41,26 @@ const IN_TUNE_CENTS = 5;
 const MAX_CENTS = 50;
 
 /**
- * Spoken updates (screen readers). The display runs at 20 Hz; speech must
- * follow the meaning instead: the note plus the offset in cents rounded to
- * ANNOUNCE_CENTS_STEP ("E2, 10 cents flat", "E2, in tune"), spoken only
- * when that pair changes, after it has held for ANNOUNCE_STABLE_MS, never
- * faster than one phrase per ANNOUNCE_MIN_GAP_MS. Silence is reported once,
- * after NO_SIGNAL_MS without a pitch, so plucking a string repeatedly does
- * not narrate every decay.
+ * Spoken updates (screen readers): the note plus the exact integer cents
+ * ("E2, 7 cents flat", "E2, in tune"), spoken the moment the pair changes.
+ * That is deliberately as live as the bars: a blind player asked for the
+ * same continuous feel a sighted player gets from the display while turning
+ * a peg, and a screen reader's own queueing already paces the speech.
+ * ANNOUNCE_STABLE_MS / ANNOUNCE_MIN_GAP_MS are the knobs for a calmer
+ * cadence if that ever proves better (a phrase then has to hold that long,
+ * and phrases come no faster than the gap). Silence is reported once, after
+ * NO_SIGNAL_MS without a pitch, so a decaying note is not narrated.
+ * Plugin Settings has a switch to turn the spoken updates off.
  */
-const ANNOUNCE_STABLE_MS = 350;
-const ANNOUNCE_MIN_GAP_MS = 900;
+const ANNOUNCE_STABLE_MS = 0;
+const ANNOUNCE_MIN_GAP_MS = 0;
 const NO_SIGNAL_MS = 2500;
-const ANNOUNCE_CENTS_STEP = 5;
 
-/** The offset as spoken: in tune inside the display's window, otherwise the
-    cents rounded to the step, with the direction. */
+/** The offset as spoken: the exact integer cents with the direction; "in
+    tune" only at zero. */
 const spokenOffset = (cents: number): string => {
-  const abs = Math.abs(cents);
-  if (abs <= IN_TUNE_CENTS) return 'in tune';
-  const rounded = Math.max(
-    ANNOUNCE_CENTS_STEP,
-    Math.round(abs / ANNOUNCE_CENTS_STEP) * ANNOUNCE_CENTS_STEP
-  );
+  const rounded = Math.round(Math.abs(cents));
+  if (rounded === 0) return 'in tune';
   return `${rounded} cents ${cents < 0 ? 'flat' : 'sharp'}`;
 };
 
